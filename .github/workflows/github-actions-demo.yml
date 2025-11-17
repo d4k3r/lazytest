@@ -14,10 +14,11 @@ jobs:
     if: >
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '@lazytest-gen') &&
-      (github.event.comment.author_association == 'OWNER' |
-
-| github.event.comment.author_association == 'COLLABORATOR' |
-| github.event.comment.author_association == 'MEMBER')
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'COLLABORATOR' ||
+        github.event.comment.author_association == 'MEMBER'
+      )
 
     # Definition of permissions for the built-in GITHUB_TOKEN.
     # Following the principle of least privilege, we provide only the required rights.
