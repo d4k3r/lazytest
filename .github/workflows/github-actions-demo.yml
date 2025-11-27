@@ -70,6 +70,7 @@ jobs:
       # 10. Основная логика: Запуск Pynguin в цикле для каждого измененного файла
       - name: Generate tests with Pynguin
         id: pynguin
+
         run: |
           echo "Changed Python files: ${{ steps.changed-files.outputs.all_changed_files }}"
           
@@ -84,6 +85,11 @@ jobs:
             module_name=$(echo "$file" | sed 's/\.py//' | tr '/' '.')
             echo "Generating tests for module: $module_name"
             
+          - name: List all changed files
+        
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "$file was changed"
+          done
             # Запуск Pynguin
             pynguin --project-path. --output-path tests/generated --module-name "$module_name"
           done
