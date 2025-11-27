@@ -1,13 +1,11 @@
 name: Pynguin Test Generator
 
-# 1. Триггер: запуск по созданию комментария
 on:
   issue_comment:
     types: [created]
 
 jobs:
   generate-tests:
-    # 2. Условие запуска: только для PR и только по команде
     if: >
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '@pynguin-test-gen') &&
@@ -20,39 +18,58 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
+      issues: write
 
     concurrency:
       group: ${{ github.repository }}-${{ github.event.issue.number }}-testgen
       cancel-in-progress: true
 
     steps:
-      # === ШАГ 1 — реакция на комментарий ===
       - name: Add reaction to comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ github.event.comment.id }}
           reactions: 'rocket'
 
-      # === ШАГ 2 — Checkout HEAD (код PR) ===
+      # === НОВЫЙ ШАГ: Получаем данные о PR через API ===
+      - name: Get PR details
+        id: pr_data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Запрашиваем имя ветки HEAD, BASE и имя репозитория отправителя
+          json=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName,baseRefName,headRepositoryOwner)
+          
+          HEAD_REF=$(echo "$json" | jq -r .headRefName)
+          BASE_REF=$(echo "$json" | jq -r .baseRefName)
+          HEAD_OWNER=$(echo "$json" | jq -r .headRepositoryOwner.login)
+          
+          echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
+          echo "base_ref=$BASE_REF" >> $GITHUB_OUTPUT
+          echo "head_owner=$HEAD_OWNER" >> $GITHUB_OUTPUT
+          
+          echo "PR Details: Merging $HEAD_REF into $BASE_REF"
+
+      # === ШАГ 2: Checkout с правильными переменными ===
       - name: Checkout PR HEAD
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          # Собираем имя репозитория (важно для форков, но и для одной repo не помешает)
+          repository: ${{ steps.pr_data.outputs.head_owner }}/${{ github.event.repository.name }}
+          ref: ${{ steps.pr_data.outputs.head_ref }}
           fetch-depth: 0
 
-      # === ШАГ 3 — Fetch BASE BRANCH для diff ===
+      # === ШАГ 3: Fetch BASE с правильной переменной ===
+      # Нам нужно явно подтянуть origin base ветки, чтобы сравнивать с ней
       - name: Fetch base branch
         run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}:${{ github.event.pull_request.base.ref }}
+          git fetch origin ${{ steps.pr_data.outputs.base_ref }}:${{ steps.pr_data.outputs.base_ref }}
 
-      # === ШАГ 4 — Set up Python ===
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # === ШАГ 5 — Install dependencies ===
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -61,25 +78,32 @@ jobs:
             pip install -r requirements.txt
           fi
 
-      # === ШАГ 6 — Find changed .py files ===
+      # === ШАГ 6: Identify changed files ===
+      # Здесь лучше использовать нативный git diff, так как tj-actions может путаться в режиме issue_comment
+      # без явного указания sha. Этот способ надежнее для вашей задачи.
       - name: Identify changed Python files
         id: changed-files
-        uses: tj-actions/changed-files@v47
-        with:
-          files: |
-            **/*.py
-      
-      
-      
+        run: |
+          # Сравниваем origin/BASE_BRANCH и текущий HEAD
+          CHANGED_FILES=$(git diff --name-only origin/${{ steps.pr_data.outputs.base_ref }} HEAD -- '*.py')
+          
+          # Убираем переносы строк, заменяя их пробелами (для вывода)
+          CHANGED_FILES_ONE_LINE=$(echo "$CHANGED_FILES" | tr '\n' ' ')
+          
+          echo "Detected files: $CHANGED_FILES_ONE_LINE"
+          
+          # Записываем в output (с поддержкой многострочности для GITHUB_OUTPUT)
+          {
+            echo "all_changed_files<<EOF"
+            echo "$CHANGED_FILES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
-      # === ШАГ 7 — Run Pynguin ===
+      # === ШАГ 7: Run Pynguin ===
       - name: Generate tests with Pynguin
         env:
           PYNGUIN_DANGER_AWARE: "1"
         run: |
-          echo "Changed .py files:"
-          echo "${{ steps.changed-files.outputs.all_changed_files }}"
-
           CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
 
           if [ -z "$CHANGED" ]; then
@@ -89,27 +113,36 @@ jobs:
 
           mkdir -p tests/generated
 
+          # Читаем список файлов (они разделены новыми строками из git diff)
           echo "$CHANGED" | while read file; do
-            [ -z "$file" ] && continue  
+            # Пропускаем пустые строки
+            [ -z "$file" ] && continue
+            
+            # Проверяем, существует ли файл (вдруг он был удален)
+            if [ ! -f "$file" ]; then
+                echo "File $file was deleted, skipping..."
+                continue
+            fi
+            
             echo "$file was changed"
 
             module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
             echo "Generating tests for module: $module_name"
 
-            pynguin --project-path . --output-path tests/generated --module-name "$module_name"
+            # || true чтобы ошибка в генерации одного файла не валила весь пайплайн
+            pynguin --project-path . --output-path tests/generated --module-name "$module_name" || true
           done
-      
 
-      # === ШАГ 8 — Commit generated tests ===
+      # === ШАГ 8: Commit ===
       - name: Commit and push generated tests
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "feat(tests): Add tests generated by Pynguin"
-          branch: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          branch: ${{ steps.pr_data.outputs.head_ref }}
+          # repository здесь обычно не нужен, если мы уже сделали checkout нужного репо
           file_pattern: tests/generated/*.py
 
-      # === ШАГ 9 — Success message ===
+      # (Шаги 9 и 10 без изменений, только убедитесь, что ref берется из outputs) ...
       - name: Report success
         if: success()
         uses: peter-evans/create-or-update-comment@v4
@@ -119,7 +152,7 @@ jobs:
             ✅ **Pynguin Test Generation Successful**
             
             Tests have been generated and committed to the branch  
-            **${{ github.event.pull_request.head.ref }}**.
+            **${{ steps.pr_data.outputs.head_ref }}**.
 
       # === ШАГ 10 — Failure message ===
       - name: Report failure
