@@ -64,14 +64,18 @@ jobs:
       # === ШАГ 6 — Find changed .py files ===
       - name: Identify changed Python files
         id: changed-files
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v47
         with:
-          sha: ${{ github.event.pull_request.head.sha }}
-          base_sha: ${{ github.event.pull_request.base.sha }}
+          files: |
+            **/*.py
+      
+      
       
 
       # === ШАГ 7 — Run Pynguin ===
       - name: Generate tests with Pynguin
+        env:
+          PYNGUIN_DANGER_AWARE: "1"
         run: |
           echo "Changed .py files:"
           echo "${{ steps.changed-files.outputs.all_changed_files }}"
@@ -94,6 +98,7 @@ jobs:
 
             pynguin --project-path . --output-path tests/generated --module-name "$module_name"
           done
+      
 
       # === ШАГ 8 — Commit generated tests ===
       - name: Commit and push generated tests
