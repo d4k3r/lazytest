@@ -137,16 +137,16 @@ jobs:
                   f.write(f"args={user_args}\n")
           
 
-      # === ШАГ 7 — Run Pynguin (Обновленный) ===
+      # === ШАГ 7 — Run Pynguin ===
       - name: Generate tests with Pynguin
         env:
           PYNGUIN_DANGER_AWARE: "1"
         run: |
           CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
-          USER_ARGS="${{ steps.get_args.outputs.args }}" # Получаем аргументы из парсера
+          USER_ARGS="${{ steps.get_args.outputs.args }}"
 
           if [ -z "$CHANGED" ]; then
-            echo "No Python files changed. Skipping."
+            echo "No source Python files changed. Skipping."
             exit 0
           fi
 
@@ -156,28 +156,35 @@ jobs:
             echo "🔥 Running with custom user arguments: $USER_ARGS"
           fi
 
+          # Читаем список файлов
           echo "$CHANGED" | while read file; do
+            # Пропускаем пустые строки
             [ -z "$file" ] && continue
+            
+            # Проверяем наличие файла
             if [ ! -f "$file" ]; then continue; fi
             
+            # Внимание: строка ниже должна начинаться БЕЗ дефиса
             module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
             
-            # --- Блок защиты от перезаписи (который мы обсуждали ранее) ---
+            # --- Блок защиты от перезаписи ручных тестов ---
             EXISTING_TEST=$(find tests/generated -name "test_*${module_name##*.}.py" | head -n 1)
+            
             if [ -n "$EXISTING_TEST" ]; then
               if ! grep -q "Pynguin" "$EXISTING_TEST"; then
-                 echo "⚠ Skipping manual test: $EXISTING_TEST"
+                 echo "⚠️ Skipping manual test: $EXISTING_TEST"
                  continue
               else
+                 # Если файл авто-сгенерирован — удаляем его перед обновлением
                  rm "$EXISTING_TEST"
               fi
             fi
-            # -------------------------------------------------------------
+            # -----------------------------------------------
 
             echo "Generating tests for module: $module_name"
 
-            # Вставляем $USER_ARGS в конец команды.
-            # Если пользователь ничего не ввел, переменная будет пустой и ничего не сломает.
+            # Запускаем Pynguin
+            # Мы используем || true, чтобы ошибка в одном файле не валила весь пайплайн
             pynguin \
               --project-path . \
               --output-path tests/generated \
