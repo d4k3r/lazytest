@@ -66,10 +66,11 @@ jobs:
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
-          base_ref: ${{ github.event.pull_request.base.ref }}
-          head_ref: ${{ github.event.pull_request.head.ref }}
+          sha: ${{ github.event.pull_request.head.sha }}
+          base_sha: ${{ github.event.pull_request.base.sha }}
           files: |
             **/*.py
+      
 
       # === ШАГ 7 — Run Pynguin ===
       - name: Generate tests with Pynguin
