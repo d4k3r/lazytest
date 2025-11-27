@@ -2,83 +2,86 @@
 # Please check them before you use them.
 import pytest
 import code_for_tests as module_0
+import builtins as module_1
 
 
 def test_case_0():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-
-
-def test_case_1():
     module_0.random_stats()
 
 
+def test_case_1():
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    var_0 = calculator_0.clear()
+    assert var_0 == 0
+    var_1 = module_0.average(var_0)
+    assert var_1 == 0
+
+
+@pytest.mark.xfail(strict=True)
 def test_case_2():
-    str_0 = "M"
-    var_0 = module_0.add(str_0, str_0)
-    assert var_0 == "MM"
+    set_0 = set()
+    none_type_0 = None
+    var_0 = module_0.average(none_type_0)
+    assert var_0 == 0
+    module_0.add(set_0, set_0)
 
 
 def test_case_3():
-    none_type_0 = None
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    calculator_0.multiply(none_type_0, none_type_0)
+    bytes_0 = b"\xc3\xe7\xad3\xd4w\x9e\xe9\x10\xc9\xc6\x1cR\xe9\xe1\x19\xbd"
+    var_0 = module_0.reverse_string(bytes_0)
+    assert var_0 == b"\xbd\x19\xe1\xe9R\x1c\xc6\xc9\x10\xe9\x9ew\xd43\xad\xe7\xc3"
+    module_0.random_stats()
 
 
 def test_case_4():
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    var_0 = calculator_0.clear()
-    assert var_0 == 0
 
 
 def test_case_5():
-    int_0 = 1629
-    var_0 = module_0.fahrenheit_to_celsius(int_0)
-    assert var_0 == pytest.approx(887.2222222222222, abs=0.01, rel=0.01)
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    bytes_0 = b"\r\xb5 H\xb5X\x1c8\xd3-\xd3"
-    complex_0 = -133.89 - 1288.4713j
-    float_0 = 1660.266383
-    tuple_0 = (var_0, var_0, complex_0, float_0)
-    calculator_0.add(bytes_0, tuple_0)
+    set_0 = set()
+    var_0 = module_0.Calculator()
+    assert var_0.memory == 0
+    var_0.add(var_0, set_0)
 
 
 def test_case_6():
+    int_0 = -92
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    bool_0 = False
-    var_0 = module_0.average(bool_0)
+    var_0 = calculator_0.clear()
     assert var_0 == 0
-    module_0.random_stats()
-    var_1 = module_0.average(var_0)
-    assert var_1 == 0
-    var_2 = module_0.factorial(var_1)
-    assert var_2 == 1
+    var_1 = calculator_0.multiply(int_0, int_0)
+    assert var_1 == 8464
+    assert calculator_0.memory == 8464
 
 
 def test_case_7():
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    module_0.reverse_string(calculator_0)
+    var_0 = calculator_0.clear()
+    assert var_0 == 0
+    var_1 = module_0.factorial(var_0)
+    assert var_1 == 1
 
 
-@pytest.mark.xfail(strict=True)
 def test_case_8():
-    int_0 = 3915
-    module_0.factorial(int_0)
-
-
-def test_case_9():
+    object_0 = module_1.object()
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
     var_0 = calculator_0.clear()
     assert var_0 == 0
-    var_1 = module_0.fahrenheit_to_celsius(var_0)
-    assert var_1 == pytest.approx(-17.77777777777778, abs=0.01, rel=0.01)
-    var_2 = module_0.factorial(var_0)
-    assert var_2 == 1
+    module_0.fahrenheit_to_celsius(object_0)
+
+
+@pytest.mark.xfail(strict=True)
+def test_case_9():
+    int_0 = 3302
+    module_0.factorial(int_0)
+
+
+def test_case_10():
+    float_0 = -3315.09822
     with pytest.raises(ValueError):
-        module_0.factorial(var_1)
+        module_0.factorial(float_0)
