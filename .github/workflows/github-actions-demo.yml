@@ -74,6 +74,12 @@ jobs:
         run: |
           echo "Changed Python files: ${{ steps.changed-files.outputs.all_changed_files }}"
           
+          - name: List all changed files
+        
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "$file was changed"
+          done
+          
           # Проверка, есть ли измененные файлы
           if [ -z "${{ steps.changed-files.outputs.all_changed_files }}" ]; then
             echo "No.py files changed in this PR. Skipping test generation."
@@ -85,11 +91,7 @@ jobs:
             module_name=$(echo "$file" | sed 's/\.py//' | tr '/' '.')
             echo "Generating tests for module: $module_name"
             
-          - name: List all changed files
-        
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            echo "$file was changed"
-          done
+
             # Запуск Pynguin
             pynguin --project-path. --output-path tests/generated --module-name "$module_name"
           done
