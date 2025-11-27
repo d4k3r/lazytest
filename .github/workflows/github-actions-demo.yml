@@ -162,3 +162,15 @@ jobs:
             
             Please check the logs for details:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+
+      # === ШАГ 11 — Запуск тестов ===
+      - name: Run generated tests
+        run: |
+          # Устанавливаем pytest, если его нет в зависимостях
+          pip install pytest
+
+          # Запускаем тесты и выводим подробный отчет (-v)
+          # export PYTHONPATH=. нужен, чтобы тесты видели ваш code_for_tests.py в корне
+          export PYTHONPATH=$PYTHONPATH:.
+          pytest tests/generated/ -v
