@@ -162,6 +162,7 @@ jobs:
               --project-path . \
               --output-path tests/generated \
               --module-name "$module_name" \
+              --algorithm DYNAMOSA \
               --maximum-search-time 60 \
               --maximum-test-execution-timeout 5 || true
               
