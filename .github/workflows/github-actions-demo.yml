@@ -1,13 +1,13 @@
 name: Pynguin Test Generator
 
-# 1. Триггер: Запуск по созданию комментария
+# 1. Триггер: запуск по созданию комментария
 on:
   issue_comment:
     types: [created]
 
 jobs:
   generate-tests:
-    # 2. Условия: Запускать только для PR, по триггерной фразе, и только для доверенных пользователей
+    # 2. Условие запуска: только для PR и только по команде
     if: >
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '@pynguin-test-gen') &&
@@ -17,40 +17,42 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    # 3. Безопасность: Принцип наименьших привилегий
     permissions:
       pull-requests: write
       contents: write
 
-    # 4. Надежность: Управление параллелизмом (отмена устаревших запусков)
     concurrency:
       group: ${{ github.repository }}-${{ github.event.issue.number }}-testgen
       cancel-in-progress: true
 
     steps:
-      # 5. Обратная связь (Шаг 1): "Я вас услышал"
+      # === ШАГ 1 — реакция на комментарий ===
       - name: Add reaction to comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ github.event.comment.id }}
           reactions: 'rocket'
 
-      # 6. РЕШЕНИЕ ПРОБЛЕМЫ: Извлечение кода из ветки PR (включая форки)
-      - name: Checkout PR Code from Fork
+      # === ШАГ 2 — Checkout HEAD (код PR) ===
+      - name: Checkout PR HEAD
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
-          # Требуется полная история для git-auto-commit
           fetch-depth: 0
 
-      # 7. Настройка среды Python
+      # === ШАГ 3 — Fetch BASE BRANCH для diff ===
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}:${{ github.event.pull_request.base.ref }}
+
+      # === ШАГ 4 — Set up Python ===
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 8. Установка зависимостей (Pynguin и проекта)
+      # === ШАГ 5 — Install dependencies ===
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -59,29 +61,33 @@ jobs:
             pip install -r requirements.txt
           fi
 
-      # 9. Оптимизация: Поиск только измененных.py файлов в этом PR
+      # === ШАГ 6 — Find changed .py files ===
       - name: Identify changed Python files
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
+          base_ref: ${{ github.event.pull_request.base.ref }}
+          head_ref: ${{ github.event.pull_request.head.ref }}
           files: |
             **/*.py
 
-      # 10. Основная логика: Запуск Pynguin в цикле для каждого измененного файла
-      - name: Process changed files
+      # === ШАГ 7 — Run Pynguin ===
+      - name: Generate tests with Pynguin
         run: |
-          echo "Changed files:"
+          echo "Changed .py files:"
           echo "${{ steps.changed-files.outputs.all_changed_files }}"
 
           CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
 
           if [ -z "$CHANGED" ]; then
-            echo "No Python files changed. Exiting."
+            echo "No Python files changed. Skipping."
             exit 0
           fi
 
+          mkdir -p tests/generated
+
           echo "$CHANGED" | while read file; do
-            [ -z "$file" ] && continue  # пропуск пустых строк
+            [ -z "$file" ] && continue  
             echo "$file was changed"
 
             module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
@@ -89,9 +95,8 @@ jobs:
 
             pynguin --project-path . --output-path tests/generated --module-name "$module_name"
           done
-      
 
-      # 11. Сохранение результатов: Коммит в ветку PR
+      # === ШАГ 8 — Commit generated tests ===
       - name: Commit and push generated tests
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
@@ -100,7 +105,7 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           file_pattern: tests/generated/*.py
 
-      # 12. Обратная связь (Шаг 2 - Успех)
+      # === ШАГ 9 — Success message ===
       - name: Report success
         if: success()
         uses: peter-evans/create-or-update-comment@v4
@@ -109,11 +114,10 @@ jobs:
           body: |
             ✅ **Pynguin Test Generation Successful**
             
-            Tests have been successfully generated and pushed to the branch `${{ github.event.pull_request.head.ref }}`.
-            
-            Please review the generated tests before merging.
+            Tests have been generated and committed to the branch  
+            **${{ github.event.pull_request.head.ref }}**.
 
-      # 13. Обратная связь (Шаг 2 - Провал)
+      # === ШАГ 10 — Failure message ===
       - name: Report failure
         if: failure()
         uses: peter-evans/create-or-update-comment@v4
@@ -122,5 +126,5 @@ jobs:
           body: |
             ❌ **Pynguin Test Generation Failed**
             
-            An error occurred during the test generation process. 
-            Please check the [Actions logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details.
+            Please check the logs for details:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
