@@ -5,67 +5,65 @@ import code_for_tests as module_0
 
 
 def test_case_0():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
+    var_0 = module_0.Calculator()
+    assert var_0.memory == 0
 
 
 def test_case_1():
-    float_0 = 641.2194
+    module_0.random_stats()
+
+
+def test_case_2():
+    bool_0 = False
+    var_0 = module_0.average(bool_0)
+    assert var_0 == 0
+
+
+def test_case_3():
+    float_0 = 927.0
+    var_0 = module_0.factorial(float_0)
+    assert var_0 == pytest.approx(1e309, abs=0.01, rel=0.01)
+    var_1 = module_0.random_stats()
+    module_0.add(var_1, var_1)
+
+
+def test_case_4():
+    module_0.random_stats()
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    module_0.reverse_string(calculator_0)
+
+
+def test_case_5():
+    bytes_0 = b""
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    calculator_0.multiply(bytes_0, bytes_0)
+
+
+def test_case_6():
+    float_0 = -1120.0251
     with pytest.raises(ValueError):
         module_0.factorial(float_0)
 
 
-def test_case_2():
-    module_0.random_stats()
+def test_case_7():
+    float_0 = -1311.8
+    var_0 = module_0.fahrenheit_to_celsius(float_0)
+    assert var_0 == pytest.approx(-746.5555555555555, abs=0.01, rel=0.01)
+    set_0 = set()
+    module_0.reverse_string(set_0)
 
 
-def test_case_3():
-    none_type_0 = None
-    module_0.add(none_type_0, none_type_0)
-
-
-def test_case_4():
-    bool_0 = False
+def test_case_8():
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    str_0 = ""
-    var_0 = calculator_0.multiply(bool_0, str_0)
-    assert var_0 == ""
-    assert calculator_0.memory == ""
-    bool_1 = True
-    var_1 = module_0.factorial(bool_1)
-    assert var_1 == 1
-    none_type_0 = None
-    module_0.reverse_string(none_type_0)
+    calculator_0.add(calculator_0, calculator_0)
 
 
-def test_case_5():
-    str_0 = "cd`}%for_tst/"
-    set_0 = {str_0, str_0, str_0}
-    module_0.fahrenheit_to_celsius(set_0)
-
-
-def test_case_6():
-    bool_0 = False
-    var_0 = module_0.average(bool_0)
-    assert var_0 == 0
-    str_0 = ""
-    dict_0 = {var_0: str_0, str_0: var_0, bool_0: bool_0}
-    module_0.add(dict_0, dict_0)
-
-
-def test_case_7():
+def test_case_9():
     module_0.random_stats()
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
     var_0 = calculator_0.clear()
     assert var_0 == 0
-
-
-def test_case_8():
-    bool_0 = False
-    var_0 = module_0.Calculator()
-    assert var_0.memory == 0
-    str_0 = ""
-    dict_0 = {var_0: str_0, str_0: var_0, bool_0: bool_0}
-    var_0.add(str_0, dict_0)
