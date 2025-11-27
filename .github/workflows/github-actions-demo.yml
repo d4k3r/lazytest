@@ -65,36 +65,31 @@ jobs:
         uses: tj-actions/changed-files@v44
         with:
           files: |
-            **.py
+            **/*.py
 
       # 10. Основная логика: Запуск Pynguin в цикле для каждого измененного файла
-      - name: Generate tests with Pynguin
-        id: pynguin
-
+      - name: Process changed files
         run: |
-          echo "Changed Python files: ${{ steps.changed-files.outputs.all_changed_files }}"
-          
-          - name: List all changed files
-        
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            echo "$file was changed"
-          done
-          
-          # Проверка, есть ли измененные файлы
-          if [ -z "${{ steps.changed-files.outputs.all_changed_files }}" ]; then
-            echo "No.py files changed in this PR. Skipping test generation."
+          echo "Changed files:"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+
+          CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
+
+          if [ -z "$CHANGED" ]; then
+            echo "No Python files changed. Exiting."
             exit 0
           fi
 
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            # Преобразование 'src/api/main.py' в 'src.api.main'
-            module_name=$(echo "$file" | sed 's/\.py//' | tr '/' '.')
-            echo "Generating tests for module: $module_name"
-            
+          echo "$CHANGED" | while read file; do
+            [ -z "$file" ] && continue  # пропуск пустых строк
+            echo "$file was changed"
 
-            # Запуск Pynguin
-            pynguin --project-path. --output-path tests/generated --module-name "$module_name"
+            module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
+            echo "Generating tests for module: $module_name"
+
+            pynguin --project-path . --output-path tests/generated --module-name "$module_name"
           done
+      
 
       # 11. Сохранение результатов: Коммит в ветку PR
       - name: Commit and push generated tests
