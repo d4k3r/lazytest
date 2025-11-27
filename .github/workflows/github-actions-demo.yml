@@ -68,8 +68,6 @@ jobs:
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           base_sha: ${{ github.event.pull_request.base.sha }}
-          files: |
-            **/*.py
       
 
       # === ШАГ 7 — Run Pynguin ===
