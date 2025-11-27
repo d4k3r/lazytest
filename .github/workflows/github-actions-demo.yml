@@ -14,6 +14,7 @@ jobs:
        github.event.comment.author_association == 'MEMBER')
 
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     permissions:
       pull-requests: write
@@ -99,7 +100,7 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      # === ШАГ 7: Run Pynguin ===
+      # === ШАГ 7 — Run Pynguin ===
       - name: Generate tests with Pynguin
         env:
           PYNGUIN_DANGER_AWARE: "1"
@@ -113,24 +114,20 @@ jobs:
 
           mkdir -p tests/generated
 
-          # Читаем список файлов (они разделены новыми строками из git diff)
           echo "$CHANGED" | while read file; do
-            # Пропускаем пустые строки
             [ -z "$file" ] && continue
+            if [ ! -f "$file" ]; then continue; fi
             
-            # Проверяем, существует ли файл (вдруг он был удален)
-            if [ ! -f "$file" ]; then
-                echo "File $file was deleted, skipping..."
-                continue
-            fi
-            
-            echo "$file was changed"
-
             module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
             echo "Generating tests for module: $module_name"
 
-            # || true чтобы ошибка в генерации одного файла не валила весь пайплайн
-            pynguin --project-path . --output-path tests/generated --module-name "$module_name" || true
+            # Добавлены лимиты по времени
+            pynguin \
+              --project-path . \
+              --output-path tests/generated \
+              --module-name "$module_name" \
+              --maximum-search-time 60 \
+              --maximum-test-execution-timeout 5 || true
           done
 
       # === ШАГ 8: Commit ===
