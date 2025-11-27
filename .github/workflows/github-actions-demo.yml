@@ -80,21 +80,17 @@ jobs:
             pip install -r requirements.txt
           fi
 
-      # === ШАГ 6: Identify changed files ===
-      # Здесь лучше использовать нативный git diff, так как tj-actions может путаться в режиме issue_comment
-      # без явного указания sha. Этот способ надежнее для вашей задачи.
+      # === ШАГ 6 — Find changed .py files ===
       - name: Identify changed Python files
         id: changed-files
         run: |
-          # Сравниваем origin/BASE_BRANCH и текущий HEAD
-          CHANGED_FILES=$(git diff --name-only origin/${{ steps.pr_data.outputs.base_ref }} HEAD -- '*.py')
+          # Добавляем | grep -v "tests/" чтобы исключить папку с тестами
+          CHANGED_FILES=$(git diff --name-only origin/${{ steps.pr_data.outputs.base_ref }} HEAD -- '*.py' | grep -v "tests/")
           
-          # Убираем переносы строк, заменяя их пробелами (для вывода)
           CHANGED_FILES_ONE_LINE=$(echo "$CHANGED_FILES" | tr '\n' ' ')
           
           echo "Detected files: $CHANGED_FILES_ONE_LINE"
           
-          # Записываем в output (с поддержкой многострочности для GITHUB_OUTPUT)
           {
             echo "all_changed_files<<EOF"
             echo "$CHANGED_FILES"
