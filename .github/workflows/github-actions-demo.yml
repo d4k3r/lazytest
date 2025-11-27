@@ -75,6 +75,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pynguin
+          pip install pytest
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
@@ -138,7 +139,7 @@ jobs:
             
             echo "Processing $module_name..."
 
-            # === ЗАЩИТА ===
+            # ЗАЩИТА
             # Ищем существующие файлы тестов для этого модуля в папке
             EXISTING_TEST=$(find tests/generated -name "test_*${module_name##*.}.py" | head -n 1)
 
@@ -152,7 +153,7 @@ jobs:
                  echo "File was auto-generated. Safe to overwrite."
                  rm "$EXISTING_TEST"
               else
-                 echo "⚠️ WARNING: File $EXISTING_TEST seems to be MANUALLY created."
+                 echo "WARNING: File $EXISTING_TEST seems to be MANUALLY created."
                  echo "Skipping generation for $module_name to prevent data loss."
                  continue
               fi
@@ -179,7 +180,7 @@ jobs:
           # repository здесь обычно не нужен, если мы уже сделали checkout нужного репо
           file_pattern: tests/generated/*.py
 
-      # (Шаги 9 и 10 без изменений, только убедитесь, что ref берется из outputs) ...
+      # (Шаги 9 и 10 без изменений, только убедитесь, что ref берется из outputs)
       - name: Report success
         if: success()
         uses: peter-evans/create-or-update-comment@v4
@@ -208,10 +209,5 @@ jobs:
       - name: Run generated tests
         continue-on-error: true
         run: |
-          # Устанавливаем pytest, если его нет в зависимостях
-          pip install pytest
-
-          # Запускаем тесты и выводим подробный отчет (-v)
-          # export PYTHONPATH=. нужен, чтобы тесты видели ваш code_for_tests.py в корне
           export PYTHONPATH=$PYTHONPATH:.
           pytest tests/generated/ -v
