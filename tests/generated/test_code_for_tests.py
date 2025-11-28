@@ -14,68 +14,60 @@ def test_case_1():
 
 
 def test_case_2():
-    none_type_0 = None
-    var_0 = module_0.average(none_type_0)
-    assert var_0 == 0
-    var_1 = module_0.factorial(var_0)
-    assert var_1 == 1
-    object_0 = module_0.Calculator()
-    assert object_0.memory == 0
-    var_2 = module_0.fahrenheit_to_celsius(var_0)
-    assert var_2 == pytest.approx(-17.77777777777778, abs=0.01, rel=0.01)
     bool_0 = False
-    module_0.reverse_string(bool_0)
+    var_0 = module_0.average(bool_0)
+    assert var_0 == 0
+    module_0.reverse_string(var_0)
 
 
-@pytest.mark.xfail(strict=True)
 def test_case_3():
-    set_0 = set()
-    module_0.add(set_0, set_0)
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    int_0 = -2290
+    var_0 = module_0.add(int_0, int_0)
+    assert var_0 == -4580
 
 
 def test_case_4():
-    set_0 = set()
-    module_0.reverse_string(set_0)
+    var_0 = module_0.random_stats()
+    module_0.fahrenheit_to_celsius(var_0)
 
 
 def test_case_5():
-    var_0 = module_0.Calculator()
-    assert var_0.memory == 0
-    var_1 = var_0.clear()
-    assert var_1 == 0
-    bool_0 = False
-    var_2 = module_0.fahrenheit_to_celsius(bool_0)
-    assert var_2 == pytest.approx(-17.77777777777778, abs=0.01, rel=0.01)
-    module_0.reverse_string(var_2)
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    var_0 = module_0.random_stats()
+    calculator_0.multiply(var_0, calculator_0)
 
 
+@pytest.mark.xfail(strict=True)
 def test_case_6():
-    int_0 = -32
-    with pytest.raises(ValueError):
-        module_0.factorial(int_0)
+    int_0 = 1691
+    module_0.factorial(int_0)
 
 
 def test_case_7():
-    var_0 = module_0.Calculator()
-    assert var_0.memory == 0
-    var_0.multiply(var_0, var_0)
-
-
-def test_case_8():
-    complex_0 = -963.7643 + 1525.8605j
-    set_0 = {complex_0, complex_0, complex_0, complex_0, complex_0, complex_0}
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    calculator_0.add(complex_0, set_0)
-
-
-def test_case_9():
-    bool_0 = False
+    bool_0 = True
     var_0 = module_0.factorial(bool_0)
     assert var_0 == 1
 
 
-@pytest.mark.xfail(strict=True)
+def test_case_8():
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    module_0.random_stats()
+    var_0 = calculator_0.clear()
+    assert var_0 == 0
+
+
+def test_case_9():
+    int_0 = -870
+    with pytest.raises(ValueError):
+        module_0.factorial(int_0)
+
+
 def test_case_10():
-    float_0 = 1503.9
-    module_0.factorial(float_0)
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    none_type_0 = None
+    calculator_0.add(none_type_0, none_type_0)
