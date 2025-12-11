@@ -148,7 +148,7 @@ jobs:
 
           print("✅ API Key found. Configuring Gemini...")
           genai.configure(api_key=api_key)
-          model = genai.GenerativeModel('gemini-pro-latest')
+          model = genai.GenerativeModel('gemma-3-27b-it')
 
           # 2. Получаем список измененных файлов из Environment
           changed_files_str = os.environ.get("CHANGED_FILES", "")
