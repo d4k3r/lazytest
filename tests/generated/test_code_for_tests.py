@@ -5,72 +5,81 @@ import code_for_tests as module_0
 
 
 def test_case_0():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-
-
-def test_case_1():
     module_0.random_stats()
 
 
+def test_case_1():
+    bool_0 = False
+    var_0 = module_0.average(bool_0)
+    assert var_0 == 0
+    var_1 = module_0.factorial(bool_0)
+    assert var_1 == 1
+
+
 def test_case_2():
-    bool_0 = True
-    dict_0 = module_0.factorial(bool_0)
-    assert dict_0 == 1
-    var_0 = module_0.add(dict_0, dict_0)
-    assert var_0 == 2
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
+    bool_0 = False
+    var_0 = module_0.average(bool_0)
+    assert var_0 == 0
+    bool_1 = False
+    var_1 = module_0.add(bool_0, bool_1)
+    var_2 = module_0.factorial(var_1)
+    assert var_2 == 1
 
 
 def test_case_3():
-    bool_0 = True
-    var_0 = module_0.random_stats(bool_0)
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    calculator_0.add(var_0, calculator_0)
+    module_0.reverse_string(calculator_0)
 
 
 def test_case_4():
+    var_0 = module_0.Calculator()
+    assert var_0.memory == 0
+
+
+def test_case_5():
     none_type_0 = None
     module_0.fahrenheit_to_celsius(none_type_0)
 
 
-def test_case_5():
-    var_0 = module_0.Calculator()
-    assert var_0.memory == 0
-    var_1 = var_0.clear()
-    assert var_1 == 0
-    module_0.reverse_string(var_1)
-
-
 def test_case_6():
-    var_0 = module_0.Calculator()
-    assert var_0.memory == 0
-    var_0.multiply(var_0, var_0)
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    none_type_0 = None
+    calculator_0.multiply(none_type_0, none_type_0)
 
 
 def test_case_7():
-    bool_0 = False
+    module_0.random_stats()
+    bool_0 = True
     var_0 = module_0.factorial(bool_0)
     assert var_0 == 1
 
 
 def test_case_8():
-    none_type_0 = None
-    var_0 = module_0.average(none_type_0)
+    bool_0 = False
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    var_0 = calculator_0.multiply(bool_0, bool_0)
     assert var_0 == 0
-    var_1 = module_0.random_stats()
-    module_0.fahrenheit_to_celsius(var_1)
+    var_1 = calculator_0.clear()
+    assert var_1 == 0
+
+
+def test_case_9():
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    none_type_0 = None
+    calculator_0.add(none_type_0, none_type_0)
 
 
 @pytest.mark.xfail(strict=True)
-def test_case_9():
-    int_0 = 3490
+def test_case_10():
+    int_0 = 2126
     module_0.factorial(int_0)
 
 
-def test_case_10():
-    int_0 = -2351
+def test_case_11():
+    int_0 = -1227
     with pytest.raises(ValueError):
         module_0.factorial(int_0)
