@@ -5,25 +5,18 @@ import code_for_tests as module_0
 
 
 def test_case_0():
-    module_0.random_stats()
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
 
 
 def test_case_1():
-    bool_0 = False
-    var_0 = module_0.average(bool_0)
-    assert var_0 == 0
-    var_1 = module_0.factorial(bool_0)
-    assert var_1 == 1
+    int_0 = -1040
+    with pytest.raises(ValueError):
+        module_0.factorial(int_0)
 
 
 def test_case_2():
-    bool_0 = False
-    var_0 = module_0.average(bool_0)
-    assert var_0 == 0
-    bool_1 = False
-    var_1 = module_0.add(bool_0, bool_1)
-    var_2 = module_0.factorial(var_1)
-    assert var_2 == 1
+    module_0.random_stats()
 
 
 def test_case_3():
@@ -33,53 +26,65 @@ def test_case_3():
 
 
 def test_case_4():
-    var_0 = module_0.Calculator()
-    assert var_0.memory == 0
-
-
-def test_case_5():
     none_type_0 = None
     module_0.fahrenheit_to_celsius(none_type_0)
 
 
-def test_case_6():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
+def test_case_5():
+    str_0 = "-\n<8N\x0b1+-}4eikgH+]G"
+    module_0.random_stats()
+    var_0 = module_0.reverse_string(str_0)
+    assert var_0 == "G]+Hgkie4}-+1\x0bN8<\n-"
     none_type_0 = None
-    calculator_0.multiply(none_type_0, none_type_0)
+    var_1 = module_0.average(none_type_0)
+    assert var_1 == 0
+    module_0.add(none_type_0, none_type_0)
+
+
+def test_case_6():
+    int_0 = -741
+    calculator_0 = module_0.add(int_0, int_0)
+    assert calculator_0 == -1482
+    with pytest.raises(ValueError):
+        module_0.factorial(int_0)
 
 
 def test_case_7():
-    module_0.random_stats()
-    bool_0 = True
-    var_0 = module_0.factorial(bool_0)
-    assert var_0 == 1
-
-
-def test_case_8():
-    bool_0 = False
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    var_0 = calculator_0.multiply(bool_0, bool_0)
-    assert var_0 == 0
-    var_1 = calculator_0.clear()
-    assert var_1 == 0
-
-
-def test_case_9():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    none_type_0 = None
-    calculator_0.add(none_type_0, none_type_0)
+    calculator_0.multiply(calculator_0, calculator_0)
 
 
 @pytest.mark.xfail(strict=True)
+def test_case_8():
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    var_0 = module_0.Calculator()
+    assert var_0.memory == 0
+    var_1 = var_0.clear()
+    assert var_1 == 0
+    bool_0 = True
+    dict_0 = {
+        calculator_0: calculator_0,
+        calculator_0: calculator_0,
+        calculator_0: bool_0,
+    }
+    module_0.average(dict_0)
+
+
+def test_case_9():
+    var_0 = module_0.Calculator()
+    assert var_0.memory == 0
+    var_0.add(var_0, var_0)
+
+
 def test_case_10():
-    int_0 = 2126
-    module_0.factorial(int_0)
-
-
-def test_case_11():
-    int_0 = -1227
-    with pytest.raises(ValueError):
-        module_0.factorial(int_0)
+    int_0 = 282
+    var_0 = module_0.add(int_0, int_0)
+    assert var_0 == 564
+    var_1 = module_0.factorial(int_0)
+    assert (
+        var_1
+        == 1329068837384190068811150283189534157917248156984147973342429842044408817655739386347513129353362435849569694522424163497637753176795095401983716205184963777702786397656418169231229017315072038237563761242039022268879475091778340489571294395827541820719781068066789360900574790260546178182785084148575662177166918890536883308516366440681125228122921464309137998824059298263006744606693799345715148254400816380503667266738285815849549335166436915152644393492871088208158525432747246896051475099982757888000000000000000000000000000000000000000000000000000000000000000000000
+    )
+    module_0.reverse_string(var_1)
