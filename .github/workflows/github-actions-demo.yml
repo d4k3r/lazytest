@@ -1,4 +1,4 @@
-name: Pynguin Test Generator
+name: Pynguin Test Generator (Full AI)
 
 on:
   issue_comment:
@@ -8,65 +8,63 @@ jobs:
   generate-tests:
     if: >
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '@pynguin-test-gen') &&
-      (github.event.comment.author_association == 'OWNER' || 
-       github.event.comment.author_association == 'COLLABORATOR' || 
-       github.event.comment.author_association == 'MEMBER')
+      contains(github.event.comment.body, '@pynguin-test-gen')
 
     runs-on: ubuntu-latest
-    timeout-minutes: 5
 
+    # Права нужны для коммита кода и отправки комментария
     permissions:
       pull-requests: write
       contents: write
       issues: write
 
-    concurrency:
-      group: ${{ github.repository }}-${{ github.event.issue.number }}-testgen
-      cancel-in-progress: true
-
     steps:
-      - name: Add reaction to comment
+      # 1. Реакция на комментарий (визуальный фидбек)
+      - name: Add reaction
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ github.event.comment.id }}
           reactions: 'rocket'
 
-      # === НОВЫЙ ШАГ: Получаем данные о PR через API ===
+      # 2. Получение информации о ветках через API (так как issue_comment этого не знает)
       - name: Get PR details
         id: pr_data
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Запрашиваем имя ветки HEAD, BASE и имя репозитория отправителя
           json=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName,baseRefName,headRepositoryOwner)
-          
-          HEAD_REF=$(echo "$json" | jq -r .headRefName)
-          BASE_REF=$(echo "$json" | jq -r .baseRefName)
-          HEAD_OWNER=$(echo "$json" | jq -r .headRepositoryOwner.login)
-          
-          echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
-          echo "base_ref=$BASE_REF" >> $GITHUB_OUTPUT
-          echo "head_owner=$HEAD_OWNER" >> $GITHUB_OUTPUT
-          
-          echo "PR Details: Merging $HEAD_REF into $BASE_REF"
+          echo "head_ref=$(echo "$json" | jq -r .headRefName)" >> $GITHUB_OUTPUT
+          echo "base_ref=$(echo "$json" | jq -r .baseRefName)" >> $GITHUB_OUTPUT
+          echo "head_owner=$(echo "$json" | jq -r .headRepositoryOwner.login)" >> $GITHUB_OUTPUT
 
-      # === ШАГ 2: Checkout с правильными переменными ===
+      # 3. Парсинг аргументов из комментария (например, --maximum-search-time 120)
+      - name: Parse arguments
+        id: get_args
+        shell: python
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          import os, re
+          comment = os.environ.get("COMMENT_BODY", "")
+          match = re.search(r'@pynguin-test-gen\s+(.*)', comment, re.IGNORECASE)
+          user_args = re.sub(r'[^a-zA-Z0-9\-\s\._=]', '', match.group(1).strip()) if match else ""
+          user_args = re.sub(r'\s+', ' ', user_args)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"args={user_args}\n")
+
+      # 4. Checkout кода
       - name: Checkout PR HEAD
         uses: actions/checkout@v4
         with:
-          # Собираем имя репозитория (важно для форков, но и для одной repo не помешает)
           repository: ${{ steps.pr_data.outputs.head_owner }}/${{ github.event.repository.name }}
           ref: ${{ steps.pr_data.outputs.head_ref }}
           fetch-depth: 0
 
-      # === ШАГ 3: Fetch BASE с правильной переменной ===
-      # Нам нужно явно подтянуть origin base ветки, чтобы сравнивать с ней
       - name: Fetch base branch
-        run: |
-          git fetch origin ${{ steps.pr_data.outputs.base_ref }}:${{ steps.pr_data.outputs.base_ref }}
+        run: git fetch origin ${{ steps.pr_data.outputs.base_ref }}:${{ steps.pr_data.outputs.base_ref }}
 
-      - name: Set up Python
+      # 5. Установка зависимостей (включая AI библиотеки)
+      - name: Set up Python & Install
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -74,137 +72,180 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pynguin
-          pip install pytest
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          fi
+          pip install pynguin pytest google-generativeai
 
-      # === ШАГ 6 — Find changed .py files ===
-      - name: Identify changed Python files
+      # 6. Поиск измененных файлов (исключая папку tests)
+      - name: Identify changed files
         id: changed-files
         run: |
-          # Добавляем | grep -v "tests/" чтобы исключить папку с тестами
           CHANGED_FILES=$(git diff --name-only origin/${{ steps.pr_data.outputs.base_ref }} HEAD -- '*.py' | grep -v "tests/")
           
-          CHANGED_FILES_ONE_LINE=$(echo "$CHANGED_FILES" | tr '\n' ' ')
-          
-          echo "Detected files: $CHANGED_FILES_ONE_LINE"
-          
-          {
-            echo "all_changed_files<<EOF"
-            echo "$CHANGED_FILES"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+          # Если изменений нет, выходим рано, но не ломаем пайплайн
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No .py files changed."
+            echo "all_changed_files=" >> $GITHUB_OUTPUT
+          else
+            echo "Detected: $CHANGED_FILES"
+            # Многострочная запись в output
+            echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
-      # === ШАГ 7 — Run Pynguin с защитой от перезаписи ===
+      # 7. ГЕНЕРАЦИЯ ТЕСТОВ (Pynguin)
       - name: Generate tests with Pynguin
         env:
           PYNGUIN_DANGER_AWARE: "1"
         run: |
           CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
-
-          if [ -z "$CHANGED" ]; then
-            echo "No Python files changed. Skipping."
-            exit 0
-          fi
-
+          USER_ARGS="${{ steps.get_args.outputs.args }}"
+          
+          if [ -z "$CHANGED" ]; then exit 0; fi
           mkdir -p tests/generated
 
           echo "$CHANGED" | while read file; do
             [ -z "$file" ] && continue
             if [ ! -f "$file" ]; then continue; fi
             
-            # Определяем имя модуля и ожидаемое имя файла теста
             module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
-            # Pynguin по умолчанию создает файлы вида test_module_name.py
-            # Если имя модуля code_for_tests, то тест будет test_code_for_tests.py
-            # НО Pynguin иногда делает просто test_<имя>.py. 
-            # Для надежности зададим output явно, но Pynguin сам именует файлы.
-            # Поэтому мы будем искать файл, который Pynguin "собирается" создать.
             
-            # В Pynguin имя выходного файла обычно: test_<module_name>.py
-            # Поскольку module_name у нас может содержать точки (пакеты), 
-            # Pynguin превращает их в подчеркивания или сохраняет структуру.
-            # Для упрощения предположим, что файл называется test_<имя_файла>.py
-            
-            # Логика защиты:
-            # Сначала пробуем найти, есть ли уже такой тест.
-            # (Здесь небольшая сложность: мы не знаем точно, как Pynguin назовет файл до запуска,
-            # но обычно это test_ + имя модуля).
-            
-            echo "Processing $module_name..."
+            # Удаляем старый авто-тест перед пересозданием
+            find tests/generated -name "test_*${module_name##*.}.py" -delete
 
-            # ЗАЩИТА
-            # Ищем существующие файлы тестов для этого модуля в папке
-            EXISTING_TEST=$(find tests/generated -name "test_*${module_name##*.}.py" | head -n 1)
-
-            if [ -n "$EXISTING_TEST" ]; then
-              echo "Found existing test file: $EXISTING_TEST"
-              
-              # Проверяем заголовок файла (первые 5 строк)
-              if grep -q "automatically generated by Pynguin" "$EXISTING_TEST" \
-                 || grep -q "Pynguin" "$EXISTING_TEST"; then
-                 
-                 echo "File was auto-generated. Safe to overwrite."
-                 rm "$EXISTING_TEST"
-              else
-                 echo "WARNING: File $EXISTING_TEST seems to be MANUALLY created."
-                 echo "Skipping generation for $module_name to prevent data loss."
-                 continue
-              fi
-            fi
-
-            # Запуск генерации
-            echo "Generating tests for module: $module_name"
+            echo "Generating for $module_name with args: $USER_ARGS"
             
+            # Запуск Pynguin
             pynguin \
               --project-path . \
               --output-path tests/generated \
               --module-name "$module_name" \
               --algorithm DYNAMOSA \
               --maximum-search-time 60 \
-              --maximum-test-execution-timeout 5 || true
-              
+              --maximum-test-execution-timeout 5 \
+              $USER_ARGS || true
           done
 
-      # === ШАГ 8: Commit ===
-      - name: Commit and push generated tests
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "feat(tests): Add tests generated by Pynguin"
-          branch: ${{ steps.pr_data.outputs.head_ref }}
-          # repository здесь обычно не нужен, если мы уже сделали checkout нужного репо
-          file_pattern: tests/generated/*.py
+      # 8. РЕФАКТОРИНГ С GEMINI (Встроенный скрипт)
+      - name: Refactor tests with Gemini AI
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        if: steps.changed-files.outputs.all_changed_files != ''
+        run: |
+          # === НАЧАЛО PYTHON СКРИПТА ===
+          cat << 'EOF' > ai_refactor.py
+          import os
+          import glob
+          import google.generativeai as genai
+          import time
 
-      # (Шаги 9 и 10 без изменений, только убедитесь, что ref берется из outputs)
-      - name: Report success
-        if: success()
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ✅ **Pynguin Test Generation Successful**
-            
-            Tests have been generated and committed to the branch  
-            **${{ steps.pr_data.outputs.head_ref }}**.
+          api_key = os.environ.get("GEMINI_API_KEY")
+          if not api_key:
+              print("⚠️ GEMINI_API_KEY not found. Skipping AI refactor.")
+              exit(0)
 
-      # === ШАГ 10 — Failure message ===
-      - name: Report failure
-        if: failure()
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ❌ **Pynguin Test Generation Failed**
-            
-            Please check the logs for details:
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            
+          genai.configure(api_key=api_key)
+          # Используем быструю модель Flash
+          model = genai.GenerativeModel('gemini-1.5-flash')
 
-      # === ШАГ 11 — Запуск тестов ===
-      - name: Run generated tests
+          def refactor(test_path, source_path):
+              print(f"🤖 AI Processing: {test_path}")
+              try:
+                  with open(test_path, 'r') as f: test_code = f.read()
+                  with open(source_path, 'r') as f: source_code = f.read()
+                  
+                  prompt = f"""
+                  You are a Senior QA Automation Engineer.
+                  Refactor the following Python test file generated by a fuzzer (Pynguin).
+                  
+                  Context (Source Code being tested):
+                  {source_code}
+                  
+                  Current Test File:
+                  {test_code}
+                  
+                  Tasks:
+                  1. Rename test functions (e.g. 'test_case_0') to meaningful names reflecting the logic (e.g. 'test_factorial_negative').
+                  2. Add docstrings explaining WHAT is being tested.
+                  3. Keep the assertions logic intact.
+                  4. Return ONLY valid Python code. No markdown.
+                  """
+                  
+                  response = model.generate_content(prompt)
+                  new_code = response.text.replace("```python", "").replace("```", "").strip()
+                  
+                  if "def test_" in new_code:
+                      with open(test_path, 'w') as f: f.write(new_code)
+                      print("✅ Refactored successfully.")
+                  else:
+                      print("⚠️ AI response invalid. Keeping original.")
+              except Exception as e:
+                  print(f"❌ AI Error: {e}")
+
+          # Ищем сгенерированные тесты
+          files = glob.glob("tests/generated/test_*.py")
+          for test_file in files:
+              # Попытка угадать исходный файл. 
+              # test_code_for_tests.py -> code_for_tests.py
+              base = os.path.basename(test_file).replace("test_", "")
+              # Простейший поиск в корне (можно улучшить для вложенных папок)
+              if os.path.exists(base):
+                  refactor(test_file, base)
+                  time.sleep(1) # Небольшая пауза, чтобы не бить в лимиты API
+          
+          EOF
+          # === КОНЕЦ PYTHON СКРИПТА ===
+          
+          # Запускаем созданный скрипт
+          python ai_refactor.py
+          # Удаляем его, чтобы не попал в коммит
+          rm ai_refactor.py
+
+      # 9. ЗАПУСК ТЕСТОВ И СТАТИСТИКА
+      - name: Run tests & Collect Stats
+        id: run_tests
         continue-on-error: true
+        if: steps.changed-files.outputs.all_changed_files != ''
         run: |
           export PYTHONPATH=$PYTHONPATH:.
-          pytest tests/generated/ -v
+          
+          # Запуск pytest с записью в файл
+          pytest tests/generated/ -v | tee result.log
+          
+          # Парсинг строки "2 failed, 5 passed..."
+          SUMMARY=$(grep -oP '(?<== ).*?(?= =)' result.log | tail -1)
+          if [ -z "$SUMMARY" ]; then SUMMARY="Tests executed (check logs)"; fi
+          
+          echo "TEST_SUMMARY=$SUMMARY" >> $GITHUB_OUTPUT
+          
+          if grep -q "FAILED" result.log; then
+             echo "TEST_STATUS=⚠️ Issues Found" >> $GITHUB_OUTPUT
+          else
+             echo "TEST_STATUS=✅ All Passed" >> $GITHUB_OUTPUT
+          fi
+
+      # 10. КОММИТ
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        if: steps.changed-files.outputs.all_changed_files != ''
+        with:
+          commit_message: "test: AI Generated tests (${{ steps.run_tests.outputs.TEST_SUMMARY }})"
+          branch: ${{ steps.pr_data.outputs.head_ref }}
+          file_pattern: tests/generated/*.py
+
+      # 11. ОТЧЕТ
+      - name: Report results
+        if: steps.changed-files.outputs.all_changed_files != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### AI Test Generation Report
+            
+            **Status:** ${{ steps.run_tests.outputs.TEST_STATUS }}
+            **Summary:** `${{ steps.run_tests.outputs.TEST_SUMMARY }}`
+            
+            * **Generator:** Pynguin (DYNAMOSA)
+            * **Refactoring:** Google Gemini AI
+            * **Target:** `${{ steps.changed-files.outputs.all_changed_files }}`
+            
+            Check the committed files in `tests/generated/` for details.
