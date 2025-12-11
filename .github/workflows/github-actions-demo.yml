@@ -94,6 +94,7 @@ jobs:
 
       # 7. ГЕНЕРАЦИЯ ТЕСТОВ (Pynguin)
       - name: Generate tests with Pynguin
+        timeout-minutes: 3
         env:
           PYNGUIN_DANGER_AWARE: "1"
         run: |
