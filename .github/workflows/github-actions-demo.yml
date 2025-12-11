@@ -67,7 +67,7 @@ jobs:
       - name: Set up Python & Install
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
@@ -148,7 +148,7 @@ jobs:
 
           print("✅ API Key found. Configuring Gemini...")
           genai.configure(api_key=api_key)
-          model = genai.GenerativeModel('gemini-1.5-flash')
+          model = genai.GenerativeModel('gemini-2.5-flash')
 
           # 2. Получаем список измененных файлов из Environment
           changed_files_str = os.environ.get("CHANGED_FILES", "")
