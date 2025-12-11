@@ -14,60 +14,59 @@ def test_case_1():
 
 
 def test_case_2():
-    bool_0 = False
-    var_0 = module_0.average(bool_0)
-    assert var_0 == 0
-    module_0.reverse_string(var_0)
+    int_0 = 4083
+    none_type_0 = None
+    module_0.add(int_0, none_type_0)
 
 
 def test_case_3():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    int_0 = -2290
-    var_0 = module_0.add(int_0, int_0)
-    assert var_0 == -4580
+    str_0 = "C6\x0bK\tf_o=,bsc"
+    var_0 = module_0.reverse_string(str_0)
+    assert var_0 == "csb,=o_f\tK\x0b6C"
 
 
 def test_case_4():
-    var_0 = module_0.random_stats()
-    module_0.fahrenheit_to_celsius(var_0)
+    none_type_0 = None
+    module_0.fahrenheit_to_celsius(none_type_0)
 
 
 def test_case_5():
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    var_0 = module_0.random_stats()
-    calculator_0.multiply(var_0, calculator_0)
+    calculator_0.multiply(calculator_0, calculator_0)
 
 
-@pytest.mark.xfail(strict=True)
 def test_case_6():
-    int_0 = 1691
-    module_0.factorial(int_0)
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    var_0 = calculator_0.clear()
+    assert var_0 == 0
+    var_1 = calculator_0.add(var_0, var_0)
+    assert var_1 == 0
 
 
 def test_case_7():
-    bool_0 = True
-    var_0 = module_0.factorial(bool_0)
-    assert var_0 == 1
-
-
-def test_case_8():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    module_0.random_stats()
-    var_0 = calculator_0.clear()
+    none_type_0 = None
+    var_0 = module_0.average(none_type_0)
     assert var_0 == 0
 
 
+def test_case_8():
+    bool_0 = False
+    var_0 = module_0.factorial(bool_0)
+    assert var_0 == 1
+    module_0.random_stats(bool_0)
+
+
 def test_case_9():
-    int_0 = -870
+    int_0 = -1181
     with pytest.raises(ValueError):
         module_0.factorial(int_0)
 
 
+@pytest.mark.xfail(strict=True)
 def test_case_10():
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    none_type_0 = None
-    calculator_0.add(none_type_0, none_type_0)
+    int_0 = 2232
+    module_0.factorial(int_0)
