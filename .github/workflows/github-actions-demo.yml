@@ -69,10 +69,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # TODO: install dependencies based only on user's choice of generator
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pynguin pytest google-generativeai
+          pip install pynguin pytest google-generativeai openai
 
       # 6. Поиск измененных файлов (исключая папку tests)
       - name: Identify changed files
