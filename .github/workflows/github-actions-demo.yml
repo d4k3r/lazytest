@@ -125,6 +125,7 @@ jobs:
               --algorithm LLMOSA \
               --maximum-search-time 90 \
               --maximum-test-execution-timeout 5 \
+              -v \
               $USER_ARGS
           done
 
