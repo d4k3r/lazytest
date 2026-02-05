@@ -126,111 +126,111 @@ jobs:
               $USER_ARGS
           done
 
-      # 8. РЕФАКТОРИНГ С GEMINI (ИСПРАВЛЕННЫЙ)
-      - name: Refactor tests with Gemini AI
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Передаем список файлов прямо в скрипт
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        if: steps.changed-files.outputs.all_changed_files != ''
-        run: |
-          cat << 'EOF' > ai_refactor.py
-          import os
-          import google.generativeai as genai
-          import time
-          import sys
-
-          # 1. Проверка ключа
-          api_key = os.environ.get("GEMINI_API_KEY")
-          if not api_key:
-              print("❌ ERROR: GEMINI_API_KEY is missing in Secrets!")
-              sys.exit(0) # Не ломаем билд, но выходим
-
-          print("✅ API Key found. Configuring Gemini...")
-          genai.configure(api_key=api_key)
-          model = genai.GenerativeModel('gemini-2.5-flash')
-
-          # 2. Получаем список измененных файлов из Environment
-          changed_files_str = os.environ.get("CHANGED_FILES", "")
-          # Разбиваем строку по пробелам или переводам строк
-          source_files = changed_files_str.split()
-
-          def refactor(test_path, source_path):
-              print(f"🚀 Sending to AI:\n   Source: {source_path}\n   Test: {test_path}")
-              
-              try:
-                  with open(test_path, 'r') as f: test_code = f.read()
-                  with open(source_path, 'r') as f: source_code = f.read()
-                  
-                  prompt = f"""
-                  You are a Python QA Expert. Refactor this Pynguin-generated test file.
-                  
-                  RULES:
-                  1. RENAME functions to be descriptive (e.g. 'test_case_0' -> 'test_memory_init').
-                  2. ADD docstrings explaining the scenario.
-                  3. CLEAN up formatting.
-                  4. DO NOT remove the tests, just improve them.
-                  5. OUTPUT only raw Python code. No markdown blocks (```).
-                  
-                  --- SOURCE CODE ({source_path}) ---
-                  {source_code}
-                  
-                  --- TEST CODE TO REFACTOR ---
-                  {test_code}
-                  """
-                  
-                  response = model.generate_content(prompt)
-                  
-                  # Чистим ответ от маркдауна, если ИИ все-таки его добавил
-                  new_code = response.text.replace("```python", "").replace("```", "").strip()
-                  
-                  # Проверка на валидность
-                  if "def test" in new_code or "import pytest" in new_code:
-                      with open(test_path, 'w') as f: f.write(new_code)
-                      print(f"✅ File {test_path} successfully refactored by AI.")
-                  else:
-                      print(f"⚠️ AI response didn't look like code. Length: {len(new_code)}")
-                      print(f"Start of response: {new_code[:100]}")
-
-              except Exception as e:
-                  print(f"❌ Gemini API Error: {e}")
-
-          # 3. Основной цикл
-          print(f"📂 Processing source files: {source_files}")
-          
-          for source_file in source_files:
-              # Вычисляем имя теста так же, как мы делали это в Bash
-              # code_for_tests.py -> tests/generated/test_code_for_tests.py
-              
-              # Убираем расширение .py
-              module_name = source_file.replace(".py", "").replace("/", ".")
-              # Поскольку мы не знаем точно, как Pynguin назвал файл (иногда он добавляет пакеты),
-              # попробуем найти наиболее вероятного кандидата
-              
-              # Самый надежный способ: ищем файл, который заканчивается на имя модуля
-              # Например, если файл src/utils.py, ищем *utils.py в папке generated
-              base_name = os.path.basename(source_file).replace(".py", "")
-              
-              # Ищем в папке tests/generated файл, содержащий имя исходника
-              found_tests = [f for f in os.listdir("tests/generated") if base_name in f and f.startswith("test_")]
-              
-              if not found_tests:
-                  print(f"⚠️ No generated test found for {source_file}. Pynguin skipped it?")
-                  continue
-                  
-              # Берем первый найденный
-              test_file_path = os.path.join("tests/generated", found_tests[0])
-              
-              if os.path.exists(test_file_path):
-                  refactor(test_file_path, source_file)
-                  time.sleep(2) # Пауза, чтобы не словить Rate Limit (429)
-              else:
-                  print(f"❌ Test file path error: {test_file_path} does not exist.")
-
-          EOF
-          
-          python ai_refactor.py
-          rm ai_refactor.py
+#      # 8. РЕФАКТОРИНГ С GEMINI (ИСПРАВЛЕННЫЙ)
+#      - name: Refactor tests with Gemini AI
+#        env:
+#          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+#          # Передаем список файлов прямо в скрипт
+#          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+#        if: steps.changed-files.outputs.all_changed_files != ''
+#        run: |
+#          cat << 'EOF' > ai_refactor.py
+#          import os
+#          import google.generativeai as genai
+#          import time
+#          import sys
+#
+#          # 1. Проверка ключа
+#          api_key = os.environ.get("GEMINI_API_KEY")
+#          if not api_key:
+#              print("❌ ERROR: GEMINI_API_KEY is missing in Secrets!")
+#              sys.exit(0) # Не ломаем билд, но выходим
+#
+#          print("✅ API Key found. Configuring Gemini...")
+#          genai.configure(api_key=api_key)
+#          model = genai.GenerativeModel('gemini-2.5-flash')
+#
+#          # 2. Получаем список измененных файлов из Environment
+#          changed_files_str = os.environ.get("CHANGED_FILES", "")
+#          # Разбиваем строку по пробелам или переводам строк
+#          source_files = changed_files_str.split()
+#
+#          def refactor(test_path, source_path):
+#              print(f"🚀 Sending to AI:\n   Source: {source_path}\n   Test: {test_path}")
+#
+#              try:
+#                  with open(test_path, 'r') as f: test_code = f.read()
+#                  with open(source_path, 'r') as f: source_code = f.read()
+#
+#                  prompt = f"""
+#                  You are a Python QA Expert. Refactor this Pynguin-generated test file.
+#
+#                  RULES:
+#                  1. RENAME functions to be descriptive (e.g. 'test_case_0' -> 'test_memory_init').
+#                  2. ADD docstrings explaining the scenario.
+#                  3. CLEAN up formatting.
+#                  4. DO NOT remove the tests, just improve them.
+#                  5. OUTPUT only raw Python code. No markdown blocks (```).
+#
+#                  --- SOURCE CODE ({source_path}) ---
+#                  {source_code}
+#
+#                  --- TEST CODE TO REFACTOR ---
+#                  {test_code}
+#                  """
+#
+#                  response = model.generate_content(prompt)
+#
+#                  # Чистим ответ от маркдауна, если ИИ все-таки его добавил
+#                  new_code = response.text.replace("```python", "").replace("```", "").strip()
+#
+#                  # Проверка на валидность
+#                  if "def test" in new_code or "import pytest" in new_code:
+#                      with open(test_path, 'w') as f: f.write(new_code)
+#                      print(f"✅ File {test_path} successfully refactored by AI.")
+#                  else:
+#                      print(f"⚠️ AI response didn't look like code. Length: {len(new_code)}")
+#                      print(f"Start of response: {new_code[:100]}")
+#
+#              except Exception as e:
+#                  print(f"❌ Gemini API Error: {e}")
+#
+#          # 3. Основной цикл
+#          print(f"📂 Processing source files: {source_files}")
+#
+#          for source_file in source_files:
+#              # Вычисляем имя теста так же, как мы делали это в Bash
+#              # code_for_tests.py -> tests/generated/test_code_for_tests.py
+#
+#              # Убираем расширение .py
+#              module_name = source_file.replace(".py", "").replace("/", ".")
+#              # Поскольку мы не знаем точно, как Pynguin назвал файл (иногда он добавляет пакеты),
+#              # попробуем найти наиболее вероятного кандидата
+#
+#              # Самый надежный способ: ищем файл, который заканчивается на имя модуля
+#              # Например, если файл src/utils.py, ищем *utils.py в папке generated
+#              base_name = os.path.basename(source_file).replace(".py", "")
+#
+#              # Ищем в папке tests/generated файл, содержащий имя исходника
+#              found_tests = [f for f in os.listdir("tests/generated") if base_name in f and f.startswith("test_")]
+#
+#              if not found_tests:
+#                  print(f"⚠️ No generated test found for {source_file}. Pynguin skipped it?")
+#                  continue
+#
+#              # Берем первый найденный
+#              test_file_path = os.path.join("tests/generated", found_tests[0])
+#
+#              if os.path.exists(test_file_path):
+#                  refactor(test_file_path, source_file)
+#                  time.sleep(2) # Пауза, чтобы не словить Rate Limit (429)
+#              else:
+#                  print(f"❌ Test file path error: {test_file_path} does not exist.")
+#
+#          EOF
+#
+#          python ai_refactor.py
+#          rm ai_refactor.py
 
       # 9. ЗАПУСК ТЕСТОВ И СТАТИСТИКА
       - name: Run tests & Collect Stats
