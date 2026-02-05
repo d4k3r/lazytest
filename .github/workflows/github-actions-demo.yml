@@ -96,6 +96,7 @@ jobs:
       - name: Generate tests with Pynguin
         timeout-minutes: 3
         env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PYNGUIN_DANGER_AWARE: "1"
         run: |
           CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
