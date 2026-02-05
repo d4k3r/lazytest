@@ -9,77 +9,54 @@ def test_case_0():
     assert calculator_0.memory == 0
 
 
-@pytest.mark.xfail(strict=True)
 def test_case_1():
-    int_0 = 2920
-    module_0.factorial(int_0)
+    module_0.random_stats()
 
 
 def test_case_2():
-    module_0.random_stats()
+    bool_0 = False
+    module_0.add(bool_0, bool_0)
 
 
 @pytest.mark.xfail(strict=True)
 def test_case_3():
-    module_0.random_stats()
-    none_type_0 = None
-    module_0.add(none_type_0, none_type_0)
+    calculator_0 = module_0.Calculator()
+    assert calculator_0.memory == 0
+    var_0 = calculator_0.clear()
+    assert var_0 == 0
+    var_1 = module_0.fahrenheit_to_celsius(var_0)
+    assert var_1 == pytest.approx(-17.77777777777778, abs=0.01, rel=0.01)
+    calculator_1 = module_0.Calculator()
+    assert calculator_1.memory == 0
+    calculator_1.add(calculator_0, var_0)
 
 
 def test_case_4():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    var_0 = calculator_0.clear()
+    none_type_0 = None
+    var_0 = module_0.average(none_type_0)
     assert var_0 == 0
-    var_1 = module_0.factorial(var_0)
-    assert var_1 == 1
 
 
+@pytest.mark.xfail(strict=True)
 def test_case_5():
-    bool_0 = True
-    var_0 = module_0.fahrenheit_to_celsius(bool_0)
-    assert var_0 == pytest.approx(-17.22222222222222, abs=0.01, rel=0.01)
-    var_1 = module_0.factorial(bool_0)
-    assert var_1 == 1
+    var_0 = module_0.random_stats()
+    module_0.reverse_string(var_0)
 
 
+@pytest.mark.xfail(strict=True)
 def test_case_6():
-    int_0 = -718
     calculator_0 = module_0.Calculator()
     assert calculator_0.memory == 0
-    var_0 = calculator_0.clear()
-    assert var_0 == 0
-    with pytest.raises(ValueError):
-        module_0.factorial(int_0)
+    calculator_0.multiply(calculator_0, calculator_0)
 
 
 def test_case_7():
-    dict_0 = {}
-    var_0 = module_0.average(dict_0)
-    assert var_0 == 0
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
+    float_0 = 670.2446
+    with pytest.raises(ValueError):
+        module_0.factorial(float_0)
 
 
-@pytest.mark.xfail(strict=True)
 def test_case_8():
-    bool_0 = True
-    module_0.reverse_string(bool_0)
-
-
-@pytest.mark.xfail(strict=True)
-def test_case_9():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    calculator_1 = module_0.Calculator()
-    assert calculator_1.memory == 0
-    calculator_1.add(calculator_0, calculator_0)
-
-
-@pytest.mark.xfail(strict=True)
-def test_case_10():
-    calculator_0 = module_0.Calculator()
-    assert calculator_0.memory == 0
-    var_0 = calculator_0.clear()
-    assert var_0 == 0
-    calculator_0.multiply(calculator_0, var_0)
+    int_0 = 0
+    var_0 = module_0.factorial(int_0)
+    assert var_0 == 1
