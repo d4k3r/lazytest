@@ -37,21 +37,77 @@ jobs:
           echo "base_ref=$(echo "$json" | jq -r .baseRefName)" >> $GITHUB_OUTPUT
           echo "head_owner=$(echo "$json" | jq -r .headRepositoryOwner.login)" >> $GITHUB_OUTPUT
 
-      # 3. Парсинг аргументов из комментария (например, --maximum-search-time 120)
       - name: Parse arguments
         id: get_args
         shell: python
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          import os, re
+          import os, re, shlex
+
           comment = os.environ.get("COMMENT_BODY", "")
           match = re.search(r'@pynguin-test-gen\s+(.*)', comment, re.IGNORECASE)
-          user_args = re.sub(r'[^a-zA-Z0-9\-\s\._=]', '', match.group(1).strip()) if match else ""
-          user_args = re.sub(r'\s+', ' ', user_args)
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f"args={user_args}\n")
+          raw = match.group(1).strip() if match else ""
 
+          # Разбиваем корректно (учтёт кавычки)
+          try:
+              tokens = shlex.split(raw)
+          except Exception:
+              tokens = raw.split()
+
+          generator = None
+          new_tokens = []
+          i = 0
+
+          while i < len(tokens):
+              t = tokens[i]
+
+              # shape: --generator value
+              if t == "--generator":
+                  if i + 1 < len(tokens):
+                      generator = tokens[i + 1].lower()
+                      i += 2
+                      continue
+                  else:
+                      i += 1
+                      continue
+
+              # shape: --generator=val
+              if t.startswith("--generator="):
+                  generator = t.split("=", 1)[1].lower()
+                  i += 1
+                  continue
+
+              # otherwise - leave as a common argument
+              new_tokens.append(t)
+              i += 1
+
+          # whitelist of generators
+          allowed = {"pynguin", "chatgpt", "gemini", "claude"}
+
+          if generator:
+              generator = generator.lower()
+              if generator not in allowed:
+                  print(f"⚠️ Unknown generator '{generator}' — falling back to 'pynguin'")
+                  generator = "pynguin"
+          else:
+              generator = "pynguin"
+
+          # args: строка и shell-квотированная версия для безопасного восстановления
+          args = " ".join(new_tokens)
+          args_quoted = " ".join(shlex.quote(x) for x in new_tokens)
+
+          out = os.environ.get("GITHUB_OUTPUT")
+          if out:
+              with open(out, "a") as f:
+                  f.write(f"args={args}\n")
+                  f.write(f"args_quoted={args_quoted}\n")
+                  f.write(f"generator={generator}\n")   # <-- имя output: generator
+          else:
+              print("GITHUB_OUTPUT not found")
+
+
+    
       # 4. Checkout кода
       - name: Checkout PR HEAD
         uses: actions/checkout@v4
@@ -100,34 +156,79 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PYNGUIN_DANGER_AWARE: "1"
         run: |
+          GENERATOR="${{ steps.get_args.outputs.generator }}"
+          ARGS_QUOTED="${{ steps.get_args.outputs.args_quoted }}"
           CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
-          USER_ARGS="${{ steps.get_args.outputs.args }}"
+          # Normalise CRLF
+          CHANGED="${CHANGED//$'\r'/}"
           
-          if [ -z "$CHANGED" ]; then exit 0; fi
+          if [ -z "$CHANGED" ]; then
+            echo "No changed files -> skip generation"
+            exit 0
+          fi
           mkdir -p tests/generated
 
-          echo "$CHANGED" | while read file; do
+          # Восстанавливаем массив аргументов (безопасно, т.к. args_quoted строится через shlex.quote)
+          USER_ARGS_ARRAY=()
+          if [ -n "$ARGS_QUOTED" ]; then
+            eval "USER_ARGS_ARRAY=($ARGS_QUOTED)"
+          fi
+
+          echo "Generator: $GENERATOR"
+          echo "Extra args: ${USER_ARGS_ARRAY[*]}"
+
+          # Используем here-string, чтобы корректно читать строки с пробелами
+          while IFS= read -r file; do
             [ -z "$file" ] && continue
-            if [ ! -f "$file" ]; then continue; fi
-            
+            if [ ! -f "$file" ]; then
+              echo "Skip (not a file): $file"
+              continue
+            fi
+
             module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
             
-            # Удаляем старый авто-тест перед пересозданием
-            find tests/generated -name "test_*${module_name##*.}.py" -delete
+            case "$GENERATOR" in
+              pynguin)
+                # Удаляем старые тесты перед генерацией
+                find tests/generated -name "test_*${module_name##*.}.py" -delete
 
-            echo "Generating for $module_name with args: $USER_ARGS"
-            
-            # Запуск Pynguin
-            pynguin \
-              --project-path . \
-              --output-path tests/generated \
-              --module-name "$module_name" \
-              --algorithm LLMOSA \
-              --maximum-search-time 90 \
-              --maximum-test-execution-timeout 5 \
-              -v \
-              $USER_ARGS
-          done
+                echo "Generating for $module_name with args: ${USER_ARGS_ARRAY[*]}"
+                pynguin \
+                  --project-path . \
+                  --output-path tests/generated \
+                  --module-name "$module_name" \
+                  --algorithm DYNAMOSA \
+                  --maximum-search-time 60 \
+                  --maximum-test-execution-timeout 5 \
+                  -v \
+                  "${USER_ARGS_ARRAY[@]}"
+                ;;
+              chatgpt)
+                echo "ChatGPT generator"
+                ;;
+              gemini)
+                echo "Gemini generator"
+                ;;
+              claude)
+                echo "Claude generator"
+                ;;
+              *)
+                echo "Unknown generator: $GENERATOR — falling back to pynguin"
+                # fallback на pynguin (альтернатива: exit 1)
+                pynguin \
+                  --project-path . \
+                  --output-path tests/generated \
+                  --module-name "$module_name" \
+                  --algorithm DYNAMOSA \
+                  --maximum-search-time 60 \
+                  --maximum-test-execution-timeout 5 \
+                  -v \
+                  "${USER_ARGS_ARRAY[@]}"
+                ;;
+            esac
+
+          done <<< "$CHANGED"
+
 
 #      # 8. РЕФАКТОРИНГ С GEMINI (ИСПРАВЛЕННЫЙ)
 #      - name: Refactor tests with Gemini AI
