@@ -207,53 +207,54 @@ jobs:
           
           
           
-              chatgpt)
-                echo "ChatGPT generator"
-
-                export SRC_FILE="$file"
-
-                python <<'PY'
-                import os
-                from openai import OpenAI
-                
-                client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-                
-                src = os.environ["SRC_FILE"]
-                with open(src, "r", encoding="utf-8") as f:
-                    code = f.read()
-                
-                prompt = f"""
-                You are given a Python source file.
-                
-                {code}
-                
-                Write ONLY pytest tests for the functions in this file.
-                Do NOT reimplement any functions.
-                Do NOT write explanations.
-                Output ONLY valid Python code.
-                """
-                
-                resp = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": "You generate only valid pytest code."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    temperature=0,
-                )
-                
-                text = resp.choices[0].message.content
-                text = text.replace("```python", "").replace("```", "").strip()
-                
-                base = os.path.basename(src).replace(".py", "")
-                out = f"tests/generated/test_{base}.py"
-                
-                with open(out, "w", encoding="utf-8") as f:
-                    f.write(text + "\n")
-                
-                print("Written", out)
-                PY
-              ;;
+                chatgpt)
+                  echo "ChatGPT generator"
+  
+                  export SRC_FILE="$file"
+  
+                  # Обратите внимание: добавлен дефис (-) после python для явного чтения из stdin
+                  python - <<'PY'
+          import os
+          from openai import OpenAI
+          
+          client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+          
+          src = os.environ["SRC_FILE"]
+          with open(src, "r", encoding="utf-8") as f:
+              code = f.read()
+          
+          prompt = f"""
+          You are given a Python source file.
+          
+          {code}
+          
+          Write ONLY pytest tests for the functions in this file.
+          Do NOT reimplement any functions.
+          Do NOT write explanations.
+          Output ONLY valid Python code.
+          """
+          
+          resp = client.chat.completions.create(
+              model="gpt-4o-mini",
+              messages=[
+                  {"role": "system", "content": "You generate only valid pytest code."},
+                  {"role": "user", "content": prompt},
+              ],
+              temperature=0,
+          )
+          
+          text = resp.choices[0].message.content
+          text = text.replace("```python", "").replace("```", "").strip()
+          
+          base = os.path.basename(src).replace(".py", "")
+          out = f"tests/generated/test_{base}.py"
+          
+          with open(out, "w", encoding="utf-8") as f:
+              f.write(text + "\n")
+          
+          print(f"Written {out}")
+          PY
+                ;;
 
               
 
