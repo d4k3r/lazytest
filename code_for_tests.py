@@ -59,28 +59,34 @@ def random_stats(size=5):
     }
 
 
+def fahrenheit_to_celsius(fahrenheit):
+  return (fahrenheit - 32) * 5 / 9
+
+
 def main():
-    print("=== Sample Python Script ===")
+    print("\nSample Python Script")
     print(f"Run time: {datetime.now()}")
 
-    print("\n--- Basic Function Tests ---")
+    print("\nBasic Function Tests")
     print("Add(5, 7):", add(5, 7))
     print("Factorial(5):", factorial(5))
     print("Reverse('testing'):", reverse_string("testing"))
     print("Average([1,2,3,4,5]):", average([1, 2, 3, 4, 5]))
 
-    print("\n--- Class Tests ---")
+    print("\nClass Tests")
     calc = Calculator()
     print("Add using Calculator:", calc.add(10, 5))
     print("Multiply using Calculator:", calc.multiply(3, 7))
     print("Memory cleared:", calc.clear())
 
-    print("\n--- Random Stats ---")
+    print("\nRandom Stats")
     stats = random_stats()
     for k, v in stats.items():
         print(f"{k}: {v}")
 
     print("\nAll tests completed successfully!")
+
+
 
 
 if __name__ == "__main__":
