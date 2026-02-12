@@ -149,9 +149,9 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-      # 7. ГЕНЕРАЦИЯ ТЕСТОВ (Pynguin)
-      - name: Generate tests with Pynguin
-        timeout-minutes: 3
+# 7. ГЕНЕРАЦИЯ ТЕСТОВ (Pynguin / AI)
+      - name: Generate tests
+        timeout-minutes: 5
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -169,7 +169,7 @@ jobs:
           fi
           mkdir -p tests/generated
 
-          # Восстанавливаем массив аргументов (безопасно, т.к. args_quoted строится через shlex.quote)
+          # Восстанавливаем массив аргументов
           USER_ARGS_ARRAY=()
           if [ -n "$ARGS_QUOTED" ]; then
             eval "USER_ARGS_ARRAY=($ARGS_QUOTED)"
@@ -178,7 +178,7 @@ jobs:
           echo "Generator: $GENERATOR"
           echo "Extra args: ${USER_ARGS_ARRAY[*]}"
 
-          # Используем here-string, чтобы корректно читать строки с пробелами
+          # Читаем список файлов
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             if [ ! -f "$file" ]; then
@@ -190,7 +190,7 @@ jobs:
             
             case "$GENERATOR" in
               pynguin)
-                # Удаляем старые тесты перед генерацией
+                # Удаляем старые тесты
                 find tests/generated -name "test_*${module_name##*.}.py" -delete
 
                 echo "Generating for $module_name with args: ${USER_ARGS_ARRAY[*]}"
@@ -204,120 +204,112 @@ jobs:
                   -v \
                   "${USER_ARGS_ARRAY[@]}"
                 ;;
-          
-          
-          
-                      chatgpt)
-                  echo "ChatGPT generator"
-      
-                  export SRC_FILE="$file"
-      
-                  # -------------------------------------------------------------
-                  # ВАЖНО: python - <<'PY' сдвинут вправо (внутрь case),
-                  # НО сам код и закрывающий PY сдвинуты ВЛЕВО (к началу скрипта).
-                  # -------------------------------------------------------------
-                  python - <<'PY'
+
+              chatgpt)
+                echo "ChatGPT generator processing $file..."
+                export SRC_FILE="$file"
+
+                # python сдвинут вправо, но код внутри — влево до упора
+                python - <<'PY'
           import os
           from openai import OpenAI
           
-          client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-          
-          src = os.environ["SRC_FILE"]
-          with open(src, "r", encoding="utf-8") as f:
-              code = f.read()
-      
-          prompt = f"""
-          You are given a Python source file.
-      
-          {code}
-      
-          Write ONLY pytest tests for the functions in this file.
-          Do NOT reimplement any functions.
-          Do NOT write explanations.
-          Output ONLY valid Python code.
-          """
-          
-          resp = client.chat.completions.create(
-              model="gpt-4o-mini",
-              messages=[
-                  {"role": "system", "content": "You generate only valid pytest code."},
-                  {"role": "user", "content": prompt},
-              ],
-              temperature=0,
-          )
-          
-          text = resp.choices[0].message.content
-          text = text.replace("```python", "").replace("```", "").strip()
-          
-          base = os.path.basename(src).replace(".py", "")
-          out = f"tests/generated/test_{base}.py"
-      
-          with open(out, "w", encoding="utf-8") as f:
-              f.write(text + "\n")
-      
-          print(f"Written {out}")
-          PY
-          # ^^^ Этот PY должен быть строго под буквой 'p' команды python (если она в начале строки)
-          # или, точнее, на уровне ГЛАВНОГО отступа всего скрипта (где начинается while).
-                ;;
-
+          try:
+              client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
               
-
-          
-          
-          
-              gemini)
-                echo "Gemini generator"
-                
-                export SRC_FILE="$file"
-                
-                python - <<'PY'
-                import os, sys
-                import google.generativeai as genai
-                
-                genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-                
-                src = os.environ["SRC_FILE"]
-                with open(src, "r", encoding="utf-8") as f:
-                    code = f.read()
-                
-                prompt = f"""
-                You are given a Python source file.
-                
-                {code}
-                
-                Write ONLY pytest tests for the functions in this file.
-                Do NOT reimplement any functions.
-                Do NOT write explanations.
-                Output ONLY valid Python code.
-                """
-                
-                model = genai.GenerativeModel("gemini-2.5-flash")
-                
-                resp = model.generate_content(prompt)
-                
-                text = resp.text
-                text = text.replace("```python", "").replace("```", "").strip()
-                
-                base = os.path.basename(src).replace(".py", "")
-                out = f"tests/generated/test_{base}.py"
-                
-                with open(out, "w", encoding="utf-8") as f:
-                    f.write(text + "\n")
-                
-                print("Written", out)
-                PY
-              ;;
-
-          
-          
-          
-              claude)
-                echo "Claude generator"
+              src = os.environ["SRC_FILE"]
+              with open(src, "r", encoding="utf-8") as f:
+                  code = f.read()
+              
+              prompt = f"""
+              You are given a Python source file.
+              
+              {code}
+              
+              Write ONLY pytest tests for the functions in this file.
+              Do NOT reimplement any functions.
+              Do NOT write explanations.
+              Output ONLY valid Python code.
+              """
+              
+              resp = client.chat.completions.create(
+                  model="gpt-4o-mini",
+                  messages=[
+                      {"role": "system", "content": "You generate only valid pytest code."},
+                      {"role": "user", "content": prompt},
+                  ],
+                  temperature=0,
+              )
+              
+              text = resp.choices[0].message.content
+              text = text.replace("```python", "").replace("```", "").strip()
+              
+              base = os.path.basename(src).replace(".py", "")
+              out = f"tests/generated/test_{base}.py"
+              
+              with open(out, "w", encoding="utf-8") as f:
+                  f.write(text + "\n")
+              
+              print(f"Written {out}")
+          except Exception as e:
+              print(f"Error in ChatGPT gen: {e}")
+              exit(1)
+          PY
                 ;;
+
+              gemini)
+                echo "Gemini generator processing $file..."
+                export SRC_FILE="$file"
+
+                # Аналогично для Gemini: PY строго у левого края скрипта
+                python - <<'PY'
+          import os
+          import google.generativeai as genai
+          
+          try:
+              genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+              
+              src = os.environ["SRC_FILE"]
+              with open(src, "r", encoding="utf-8") as f:
+                  code = f.read()
+              
+              prompt = f"""
+              You are given a Python source file.
+              
+              {code}
+              
+              Write ONLY pytest tests for the functions in this file.
+              Do NOT reimplement any functions.
+              Do NOT write explanations.
+              Output ONLY valid Python code.
+              """
+              
+              model = genai.GenerativeModel("gemini-2.0-flash")
+              
+              resp = model.generate_content(prompt)
+              
+              text = resp.text
+              text = text.replace("```python", "").replace("```", "").strip()
+              
+              base = os.path.basename(src).replace(".py", "")
+              out = f"tests/generated/test_{base}.py"
+              
+              with open(out, "w", encoding="utf-8") as f:
+                  f.write(text + "\n")
+              
+              print(f"Written {out}")
+          except Exception as e:
+              print(f"Error in Gemini gen: {e}")
+              exit(1)
+          PY
+                ;;
+
+              claude)
+                echo "Claude generator not implemented yet."
+                ;;
+                
               *)
                 echo "Unknown generator: $GENERATOR — falling back to pynguin"
-                # fallback на pynguin (альтернатива: exit 1)
                 pynguin \
                   --project-path . \
                   --output-path tests/generated \
@@ -331,6 +323,7 @@ jobs:
             esac
 
           done <<< "$CHANGED"
+    
 
 
 #      # 8. РЕФАКТОРИНГ С GEMINI (ИСПРАВЛЕННЫЙ)
