@@ -207,12 +207,15 @@ jobs:
           
           
           
-                chatgpt)
+                      chatgpt)
                   echo "ChatGPT generator"
-  
+      
                   export SRC_FILE="$file"
-  
-                  # Обратите внимание: добавлен дефис (-) после python для явного чтения из stdin
+      
+                  # -------------------------------------------------------------
+                  # ВАЖНО: python - <<'PY' сдвинут вправо (внутрь case),
+                  # НО сам код и закрывающий PY сдвинуты ВЛЕВО (к началу скрипта).
+                  # -------------------------------------------------------------
                   python - <<'PY'
           import os
           from openai import OpenAI
@@ -222,12 +225,12 @@ jobs:
           src = os.environ["SRC_FILE"]
           with open(src, "r", encoding="utf-8") as f:
               code = f.read()
-          
+      
           prompt = f"""
           You are given a Python source file.
-          
+      
           {code}
-          
+      
           Write ONLY pytest tests for the functions in this file.
           Do NOT reimplement any functions.
           Do NOT write explanations.
@@ -248,12 +251,14 @@ jobs:
           
           base = os.path.basename(src).replace(".py", "")
           out = f"tests/generated/test_{base}.py"
-          
+      
           with open(out, "w", encoding="utf-8") as f:
               f.write(text + "\n")
-          
+      
           print(f"Written {out}")
           PY
+          # ^^^ Этот PY должен быть строго под буквой 'p' команды python (если она в начале строки)
+          # или, точнее, на уровне ГЛАВНОГО отступа всего скрипта (где начинается while).
                 ;;
 
               
