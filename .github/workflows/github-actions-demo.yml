@@ -154,6 +154,7 @@ jobs:
         timeout-minutes: 3
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PYNGUIN_DANGER_AWARE: "1"
         run: |
           GENERATOR="${{ steps.get_args.outputs.generator }}"
