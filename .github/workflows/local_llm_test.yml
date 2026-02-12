@@ -1,0 +1,15 @@
+name: Local LLM test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-local-llm:
+    runs-on: self-hosted
+
+    steps:
+      - name: Call local LLM server
+        run: |
+          curl -s -X POST http://127.0.0.1:8000/generate \
+            -H "Content-Type: application/json" \
+            -d '{"prompt":"You are writing tests for an EXISTING function add(a, b). Write ONLY pytest tests. Do NOT reimplement the function. Do NOT create tests for any other functions. Do NOT invent new functions. Output ONLY Python code."}'

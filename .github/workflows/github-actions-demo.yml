@@ -62,7 +62,7 @@ jobs:
           while i < len(tokens):
               t = tokens[i]
 
-              # shape: --generator value
+              # form: --generator value
               if t == "--generator":
                   if i + 1 < len(tokens):
                       generator = tokens[i + 1].lower()
@@ -72,7 +72,7 @@ jobs:
                       i += 1
                       continue
 
-              # shape: --generator=val
+              # form: --generator=val
               if t.startswith("--generator="):
                   generator = t.split("=", 1)[1].lower()
                   i += 1
@@ -107,7 +107,7 @@ jobs:
               print("GITHUB_OUTPUT not found")
 
 
-    
+
       # 4. Checkout кода
       - name: Checkout PR HEAD
         uses: actions/checkout@v4
