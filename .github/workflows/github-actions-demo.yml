@@ -208,11 +208,11 @@ jobs:
           
           
               chatgpt)
-                echo "ChatGPT generator"
+                  echo "ChatGPT generator"
                 
-                export SRC_FILE="$file"
+                  export SRC_FILE="$file"
                 
-                python - <<'PY'
+                  python - <<'PY'
                 import os, json, sys
                 from openai import OpenAI
                 
