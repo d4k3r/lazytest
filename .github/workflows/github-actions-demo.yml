@@ -207,7 +207,7 @@ jobs:
           
           
           
-              chatgpt)
+                              chatgpt)
                 echo "ChatGPT generator"
 
                 export SRC_FILE="$file"
