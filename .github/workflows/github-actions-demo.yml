@@ -592,41 +592,41 @@ jobs:
           src = os.environ["SRC_FILE"]
 
           try:
-              with open(src, "r", encoding="utf-8") as f:
-                  code = f.read()
-          prompt = f"""
-          You are given a Python source file.
-          
-          {code}
-          
-          Write ONLY pytest tests for the functions in this file.
-          Do NOT reimplement any functions.
-          Do NOT write explanations.
-          Output ONLY valid Python code.
-          """
-          
-              resp = requests.post(
-                  "http://127.0.0.1:8000/generate",
-                  json={"prompt": prompt},
-                  timeout=900
-              )
-          
-              resp.raise_for_status()
-          
-              data = resp.json()
-              text = data.get("text", "").strip()
-          
-              if not text:
-                  print("Local LLM returned empty output")
-                  sys.exit(1)
-          
-              base = os.path.basename(src).replace(".py", "")
-              out = f"tests/generated/test_{base}.py"
-          
-              with open(out, "w", encoding="utf-8") as f:
-                  f.write(text + "\n")
-          
-              print(f"Written {out}")
+            with open(src, "r", encoding="utf-8") as f:
+                code = f.read()
+            prompt = f"""
+            You are given a Python source file.
+            
+            {code}
+            
+            Write ONLY pytest tests for the functions in this file.
+            Do NOT reimplement any functions.
+            Do NOT write explanations.
+            Output ONLY valid Python code.
+            """
+            
+            resp = requests.post(
+                "http://127.0.0.1:8000/generate",
+                json={"prompt": prompt},
+                timeout=900
+            )
+        
+            resp.raise_for_status()
+        
+            data = resp.json()
+            text = data.get("text", "").strip()
+        
+            if not text:
+                print("Local LLM returned empty output")
+                sys.exit(1)
+        
+            base = os.path.basename(src).replace(".py", "")
+            out = f"tests/generated/test_{base}.py"
+        
+            with open(out, "w", encoding="utf-8") as f:
+                f.write(text + "\n")
+        
+            print(f"Written {out}")
           
           except Exception as e:
               print(f"Local LLM error: {e}")
