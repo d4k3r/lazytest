@@ -547,8 +547,8 @@ jobs:
       - name: Generate tests
         timeout-minutes: 5
         run: |
-          GENERATOR="${{ steps.get_args.outputs.generator }}"
-          ARGS_QUOTED="${{ steps.get_args.outputs.args_quoted }}"
+          GENERATOR="${{ needs.parse-args.outputs.generator }}"
+          ARGS_QUOTED="${{ needs.parse-args.outputs.args_quoted }}"
           CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
           # Normalise CRLF
           CHANGED="${CHANGED//$'\r'/}"
