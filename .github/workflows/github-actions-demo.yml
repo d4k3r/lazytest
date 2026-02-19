@@ -5,11 +5,73 @@ on:
     types: [created]
 
 jobs:
-  generate-tests:
+
+# PARSE ARGUMENTS
+  parse-args:
     if: >
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '@pynguin-test-gen')
 
+    runs-on: ubuntu-latest
+
+    outputs:
+      generator: ${{ steps.parse.outputs.generator }}
+      args_quoted: ${{ steps.parse.outputs.args_quoted }}
+
+    steps:
+      - name: Parse comment arguments
+        id: parse
+        shell: python
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          import os, re, shlex
+
+          comment = os.environ.get("COMMENT_BODY", "")
+          match = re.search(r'@pynguin-test-gen\s+(.*)', comment, re.IGNORECASE)
+          raw = match.group(1).strip() if match else ""
+
+          try:
+              tokens = shlex.split(raw)
+          except:
+              tokens = raw.split()
+
+          generator = "pynguin"
+          new_tokens = []
+
+          i = 0
+          while i < len(tokens):
+              t = tokens[i]
+
+              if t == "--generator" and i+1 < len(tokens):
+                  generator = tokens[i+1].lower()
+                  i += 2
+                  continue
+
+              if t.startswith("--generator="):
+                  generator = t.split("=",1)[1].lower()
+                  i += 1
+                  continue
+
+              new_tokens.append(t)
+              i += 1
+
+          allowed = {"pynguin","chatgpt","gemini","claude","local-llm"}
+
+          if generator not in allowed:
+              generator = "pynguin"
+
+          args_quoted = " ".join(shlex.quote(x) for x in new_tokens)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"generator={generator}\n")
+              f.write(f"args_quoted={args_quoted}\n")
+  
+
+
+  generate-tests-cloud:
+    needs: parse-args
+    if: needs.parse-args.outputs.generator != 'local-llm'
     runs-on: ubuntu-latest
 
     # Права нужны для коммита кода и отправки комментария
@@ -37,78 +99,7 @@ jobs:
           echo "base_ref=$(echo "$json" | jq -r .baseRefName)" >> $GITHUB_OUTPUT
           echo "head_owner=$(echo "$json" | jq -r .headRepositoryOwner.login)" >> $GITHUB_OUTPUT
 
-      - name: Parse arguments
-        id: get_args
-        shell: python
-        env:
-          COMMENT_BODY: ${{ github.event.comment.body }}
-        run: |
-          import os, re, shlex
-
-          comment = os.environ.get("COMMENT_BODY", "")
-          match = re.search(r'@pynguin-test-gen\s+(.*)', comment, re.IGNORECASE)
-          raw = match.group(1).strip() if match else ""
-
-          # Разбиваем корректно (учтёт кавычки)
-          try:
-              tokens = shlex.split(raw)
-          except Exception:
-              tokens = raw.split()
-
-          generator = None
-          new_tokens = []
-          i = 0
-
-          while i < len(tokens):
-              t = tokens[i]
-
-              # form: --generator value
-              if t == "--generator":
-                  if i + 1 < len(tokens):
-                      generator = tokens[i + 1].lower()
-                      i += 2
-                      continue
-                  else:
-                      i += 1
-                      continue
-
-              # form: --generator=val
-              if t.startswith("--generator="):
-                  generator = t.split("=", 1)[1].lower()
-                  i += 1
-                  continue
-
-              # otherwise - leave as a common argument
-              new_tokens.append(t)
-              i += 1
-
-          # whitelist of generators
-          allowed = {"pynguin", "chatgpt", "gemini", "claude"}
-
-          if generator:
-              generator = generator.lower()
-              if generator not in allowed:
-                  print(f"⚠️ Unknown generator '{generator}' — falling back to 'pynguin'")
-                  generator = "pynguin"
-          else:
-              generator = "pynguin"
-
-          # args: строка и shell-квотированная версия для безопасного восстановления
-          args = " ".join(new_tokens)
-          args_quoted = " ".join(shlex.quote(x) for x in new_tokens)
-
-          out = os.environ.get("GITHUB_OUTPUT")
-          if out:
-              with open(out, "a") as f:
-                  f.write(f"args={args}\n")
-                  f.write(f"args_quoted={args_quoted}\n")
-                  f.write(f"generator={generator}\n")   # <-- имя output: generator
-          else:
-              print("GITHUB_OUTPUT not found")
-
-
-
-      # 4. Checkout кода
+      # 3. Checkout кода
       - name: Checkout PR HEAD
         uses: actions/checkout@v4
         with:
@@ -119,7 +110,7 @@ jobs:
       - name: Fetch base branch
         run: git fetch origin ${{ steps.pr_data.outputs.base_ref }}:${{ steps.pr_data.outputs.base_ref }}
 
-      # 5. Установка зависимостей (включая AI библиотеки)
+      # 4. Установка зависимостей (включая AI библиотеки)
       - name: Set up Python & Install
         uses: actions/setup-python@v5
         with:
@@ -131,7 +122,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pynguin pytest google-generativeai openai
 
-      # 6. Поиск измененных файлов (исключая папку tests)
+      # 5. Поиск измененных файлов (исключая папку tests)
       - name: Identify changed files
         id: changed-files
         run: |
@@ -149,7 +140,7 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-# 7. ГЕНЕРАЦИЯ ТЕСТОВ (Pynguin / AI)
+      # 6. ГЕНЕРАЦИЯ ТЕСТОВ (Pynguin / AI)
       - name: Generate tests
         timeout-minutes: 5
         env:
@@ -478,6 +469,328 @@ jobs:
             
             * **Generator:** Pynguin (DYNAMOSA)
             * **Refactoring:** Google Gemini AI
+            * **Target:** `${{ steps.changed-files.outputs.all_changed_files }}`
+            
+            Check the committed files in `tests/generated/` for details.
+
+  generate-tests-local:
+    needs: parse-args
+    if: needs.parse-args.outputs.generator == 'local-llm'
+    runs-on: ubuntu-latest
+
+    # Права нужны для коммита кода и отправки комментария
+    permissions:
+      pull-requests: write
+      contents: write
+      issues: write
+
+    steps:
+      # 1. Реакция на комментарий (визуальный фидбек)
+      - name: Add reaction
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          reactions: 'rocket'
+
+      # 2. Получение информации о ветках через API (так как issue_comment этого не знает)
+      - name: Get PR details
+        id: pr_data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          json=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName,baseRefName,headRepositoryOwner)
+          echo "head_ref=$(echo "$json" | jq -r .headRefName)" >> $GITHUB_OUTPUT
+          echo "base_ref=$(echo "$json" | jq -r .baseRefName)" >> $GITHUB_OUTPUT
+          echo "head_owner=$(echo "$json" | jq -r .headRepositoryOwner.login)" >> $GITHUB_OUTPUT
+
+      # 3. Checkout кода
+      - name: Checkout PR HEAD
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr_data.outputs.head_owner }}/${{ github.event.repository.name }}
+          ref: ${{ steps.pr_data.outputs.head_ref }}
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ steps.pr_data.outputs.base_ref }}:${{ steps.pr_data.outputs.base_ref }}
+
+      # 4. Установка зависимостей
+      - name: Set up Python & Install
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests
+
+      # 5. Поиск измененных файлов (исключая папку tests)
+      - name: Identify changed files
+        id: changed-files
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ steps.pr_data.outputs.base_ref }} HEAD -- '*.py' | grep -v "tests/")
+          
+          # Если изменений нет, выходим рано, но не ломаем пайплайн
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No .py files changed."
+            echo "all_changed_files=" >> $GITHUB_OUTPUT
+          else
+            echo "Detected: $CHANGED_FILES"
+            # Многострочная запись в output
+            echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      # 6. ГЕНЕРАЦИЯ ТЕСТОВ (Local LLM)
+      - name: Generate tests
+        timeout-minutes: 5
+        run: |
+          GENERATOR="${{ steps.get_args.outputs.generator }}"
+          ARGS_QUOTED="${{ steps.get_args.outputs.args_quoted }}"
+          CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
+          # Normalise CRLF
+          CHANGED="${CHANGED//$'\r'/}"
+          
+          if [ -z "$CHANGED" ]; then
+            echo "No changed files -> skip generation"
+            exit 0
+          fi
+          mkdir -p tests/generated
+          
+          # Восстанавливаем массив аргументов
+          USER_ARGS_ARRAY=()
+          if [ -n "$ARGS_QUOTED" ]; then
+            eval "USER_ARGS_ARRAY=($ARGS_QUOTED)"
+          fi
+          
+          echo "Generator: $GENERATOR"
+          echo "Extra args: ${USER_ARGS_ARRAY[*]}"
+          
+          # Читаем список файлов
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            if [ ! -f "$file" ]; then
+              echo "Skip (not a file): $file"
+              continue
+            fi
+          
+            module_name=$(echo "$file" | sed 's/\.py$//' | tr '/' '.')
+          
+            case "$GENERATOR" in
+              local-llm)
+                echo "Local LLM generator processing $file..."
+                export SRC_FILE="$file"
+
+                # python сдвинут вправо, но код внутри — влево до упора
+                python - <<'PY'
+          import os
+          import requests
+          import sys
+          
+          src = os.environ["SRC_FILE"]
+
+          try:
+              with open(src, "r", encoding="utf-8") as f:
+                  code = f.read()
+          prompt = f"""
+          You are given a Python source file.
+          
+          {code}
+          
+          Write ONLY pytest tests for the functions in this file.
+          Do NOT reimplement any functions.
+          Do NOT write explanations.
+          Output ONLY valid Python code.
+          """
+          
+              resp = requests.post(
+                  "http://127.0.0.1:8000/generate",
+                  json={"prompt": prompt},
+                  timeout=900
+              )
+          
+              resp.raise_for_status()
+          
+              data = resp.json()
+              text = data.get("text", "").strip()
+          
+              if not text:
+                  print("Local LLM returned empty output")
+                  sys.exit(1)
+          
+              base = os.path.basename(src).replace(".py", "")
+              out = f"tests/generated/test_{base}.py"
+          
+              with open(out, "w", encoding="utf-8") as f:
+                  f.write(text + "\n")
+          
+              print(f"Written {out}")
+          
+          except Exception as e:
+              print(f"Local LLM error: {e}")
+              sys.exit(1)
+          PY
+            ;;
+
+            esac
+          
+          done <<< "$CHANGED"
+      
+      
+
+      #      # 8. РЕФАКТОРИНГ С GEMINI (ИСПРАВЛЕННЫЙ)
+      #      - name: Refactor tests with Gemini AI
+      #        env:
+      #          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      #          # Передаем список файлов прямо в скрипт
+      #          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      #        if: steps.changed-files.outputs.all_changed_files != ''
+      #        run: |
+      #          cat << 'EOF' > ai_refactor.py
+      #          import os
+      #          import google.generativeai as genai
+      #          import time
+      #          import sys
+      #
+      #          # 1. Проверка ключа
+      #          api_key = os.environ.get("GEMINI_API_KEY")
+      #          if not api_key:
+      #              print("❌ ERROR: GEMINI_API_KEY is missing in Secrets!")
+      #              sys.exit(0) # Не ломаем билд, но выходим
+      #
+      #          print("✅ API Key found. Configuring Gemini...")
+      #          genai.configure(api_key=api_key)
+      #          model = genai.GenerativeModel('gemini-2.5-flash')
+      #
+      #          # 2. Получаем список измененных файлов из Environment
+      #          changed_files_str = os.environ.get("CHANGED_FILES", "")
+      #          # Разбиваем строку по пробелам или переводам строк
+      #          source_files = changed_files_str.split()
+      #
+      #          def refactor(test_path, source_path):
+      #              print(f"🚀 Sending to AI:\n   Source: {source_path}\n   Test: {test_path}")
+      #
+      #              try:
+      #                  with open(test_path, 'r') as f: test_code = f.read()
+      #                  with open(source_path, 'r') as f: source_code = f.read()
+      #
+      #                  prompt = f"""
+      #                  You are a Python QA Expert. Refactor this Pynguin-generated test file.
+      #
+      #                  RULES:
+      #                  1. RENAME functions to be descriptive (e.g. 'test_case_0' -> 'test_memory_init').
+      #                  2. ADD docstrings explaining the scenario.
+      #                  3. CLEAN up formatting.
+      #                  4. DO NOT remove the tests, just improve them.
+      #                  5. OUTPUT only raw Python code. No markdown blocks (```).
+      #
+      #                  --- SOURCE CODE ({source_path}) ---
+      #                  {source_code}
+      #
+      #                  --- TEST CODE TO REFACTOR ---
+      #                  {test_code}
+      #                  """
+      #
+      #                  response = model.generate_content(prompt)
+      #
+      #                  # Чистим ответ от маркдауна, если ИИ все-таки его добавил
+      #                  new_code = response.text.replace("```python", "").replace("```", "").strip()
+      #
+      #                  # Проверка на валидность
+      #                  if "def test" in new_code or "import pytest" in new_code:
+      #                      with open(test_path, 'w') as f: f.write(new_code)
+      #                      print(f"✅ File {test_path} successfully refactored by AI.")
+      #                  else:
+      #                      print(f"⚠️ AI response didn't look like code. Length: {len(new_code)}")
+      #                      print(f"Start of response: {new_code[:100]}")
+      #
+      #              except Exception as e:
+      #                  print(f"❌ Gemini API Error: {e}")
+      #
+      #          # 3. Основной цикл
+      #          print(f"📂 Processing source files: {source_files}")
+      #
+      #          for source_file in source_files:
+      #              # Вычисляем имя теста так же, как мы делали это в Bash
+      #              # code_for_tests.py -> tests/generated/test_code_for_tests.py
+      #
+      #              # Убираем расширение .py
+      #              module_name = source_file.replace(".py", "").replace("/", ".")
+      #              # Поскольку мы не знаем точно, как Pynguin назвал файл (иногда он добавляет пакеты),
+      #              # попробуем найти наиболее вероятного кандидата
+      #
+      #              # Самый надежный способ: ищем файл, который заканчивается на имя модуля
+      #              # Например, если файл src/utils.py, ищем *utils.py в папке generated
+      #              base_name = os.path.basename(source_file).replace(".py", "")
+      #
+      #              # Ищем в папке tests/generated файл, содержащий имя исходника
+      #              found_tests = [f for f in os.listdir("tests/generated") if base_name in f and f.startswith("test_")]
+      #
+      #              if not found_tests:
+      #                  print(f"⚠️ No generated test found for {source_file}. Pynguin skipped it?")
+      #                  continue
+      #
+      #              # Берем первый найденный
+      #              test_file_path = os.path.join("tests/generated", found_tests[0])
+      #
+      #              if os.path.exists(test_file_path):
+      #                  refactor(test_file_path, source_file)
+      #                  time.sleep(2) # Пауза, чтобы не словить Rate Limit (429)
+      #              else:
+      #                  print(f"❌ Test file path error: {test_file_path} does not exist.")
+      #
+      #          EOF
+      #
+      #          python ai_refactor.py
+      #          rm ai_refactor.py
+
+      # 9. ЗАПУСК ТЕСТОВ И СТАТИСТИКА
+      - name: Run tests & Collect Stats
+        id: run_tests
+        continue-on-error: true
+        if: steps.changed-files.outputs.all_changed_files != ''
+        run: |
+          export PYTHONPATH=$PYTHONPATH:.
+          
+          # Запуск pytest с записью в файл
+          pytest tests/generated/ -v | tee result.log
+          
+          # Парсинг строки "2 failed, 5 passed..."
+          SUMMARY=$(grep -oP '(?<== ).*?(?= =)' result.log | tail -1)
+          if [ -z "$SUMMARY" ]; then SUMMARY="Tests executed (check logs)"; fi
+          
+          echo "TEST_SUMMARY=$SUMMARY" >> $GITHUB_OUTPUT
+          
+          if grep -q "FAILED" result.log; then
+             echo "TEST_STATUS=⚠️ Issues Found" >> $GITHUB_OUTPUT
+          else
+             echo "TEST_STATUS=✅ All Passed" >> $GITHUB_OUTPUT
+          fi
+
+      # 10. КОММИТ
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        if: steps.changed-files.outputs.all_changed_files != ''
+        with:
+          commit_message: "test: Local LLM Generated tests (${{ steps.run_tests.outputs.TEST_SUMMARY }})"
+          branch: ${{ steps.pr_data.outputs.head_ref }}
+          file_pattern: tests/generated/*.py
+
+      # 11. ОТЧЕТ
+      - name: Report results
+        if: steps.changed-files.outputs.all_changed_files != ''
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Local LLM Test Generation Report
+            
+            **Status:** ${{ steps.run_tests.outputs.TEST_STATUS }}
+            **Summary:** `${{ steps.run_tests.outputs.TEST_SUMMARY }}`
+            
+            * **Generator:** Qwen_7b
             * **Target:** `${{ steps.changed-files.outputs.all_changed_files }}`
             
             Check the committed files in `tests/generated/` for details.
