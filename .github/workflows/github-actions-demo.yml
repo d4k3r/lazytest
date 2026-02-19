@@ -476,7 +476,7 @@ jobs:
   generate-tests-local:
     needs: parse-args
     if: needs.parse-args.outputs.generator == 'local-llm'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     # Права нужны для коммита кода и отправки комментария
     permissions:
