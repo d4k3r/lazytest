@@ -1,29 +1,40 @@
 ﻿#!/usr/bin/env python3
 import os
 import csv
+import time
 import json
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# --- ПУТИ К ТВОЕМУ RUN_1 ---
-# Убедись, что пути совпадают с теми, куда сгенерировались тесты
-OUT_DIR = os.path.expanduser("~/clown/3rd_year_project/testing/generated_tests/qwen_coder/run_1")
-CSV_IN = os.path.join(OUT_DIR, "metrics_qwen_coder_TheAlgorithms.csv")
-CSV_OUT = os.path.join(OUT_DIR, "metrics_fixed_coverage.csv")
-REPO_ROOT = os.path.expanduser("~/clown/3rd_year_project/testing/repos_for_testing/TheAlgorithms")
+# === НОВЫЕ БАЗОВЫЕ ПУТИ ===
+# Указываем только корневую папку со всеми run-ами
+BASE_DIR = os.path.expanduser("~/git/lazytest/testing/generated_tests/devstral_cyankiwi")
+REPO_ROOT = os.path.expanduser("~/git/lazytest/testing/repos_for_testing/TheAlgorithms")
 
-MAX_WORKERS = 24
+# Для Coverage ставим 14 (на твоем 9800X3D)
+MAX_WORKERS = 15
 
 
-def evaluate_test(row):
+def evaluate_test(row, current_out_dir):
+    """
+    Обрабатывает один тест.
+    Добавлен аргумент current_out_dir, чтобы потоки знали, в какой папке мы сейчас находимся.
+    """
     repo, src_file, status, gen_time, chars, n_tests, attempts, old_file_cov, old_repo_cov, notes = row
 
     if status != "ok":
         return row
 
-    rel_path = os.path.relpath(src_file, REPO_ROOT)
+    # === УМНЫЙ ПАРСИНГ ПУТЕЙ ===
+    if "TheAlgorithms/" in src_file:
+        rel_path = src_file.split("TheAlgorithms/")[-1].strip(r"\/")
+    else:
+        rel_path = os.path.relpath(src_file, REPO_ROOT)
+
     base = os.path.splitext(os.path.basename(rel_path))[0]
-    test_file = os.path.join(OUT_DIR, repo, os.path.dirname(rel_path), f"test_{base}.py")
+
+    # Используем current_out_dir вместо глобальной переменной!
+    test_file = os.path.join(current_out_dir, repo, os.path.dirname(rel_path), f"test_{base}.py")
 
     if not os.path.exists(test_file):
         row[7] = 0.0
@@ -31,13 +42,12 @@ def evaluate_test(row):
         return row
 
     cov_json = f"{test_file}.cov.json"
-    cov_db   = f"{test_file}.coverage"
+    cov_db = f"{test_file}.coverage"
 
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{REPO_ROOT}{os.pathsep}{env.get('PYTHONPATH', '')}"
     env["COVERAGE_FILE"] = cov_db
 
-    # --cov=REPO_ROOT so path matching works; we filter to src_file afterwards
     cmd = [
         "pytest", test_file,
         f"--cov={REPO_ROOT}",
@@ -49,11 +59,14 @@ def evaluate_test(row):
     ]
 
     new_cov = 0.0
+    # print(f"      [>] Тестируем: test_{base}.py")
     try:
-        subprocess.run(
+        # Добавили text=True, чтобы получать строки, а не байты
+        result = subprocess.run(
             cmd, env=env,
             capture_output=True,
-            timeout=30,          # outer timeout longer than pytest's inner --timeout
+            text=True,
+            timeout=30,
             cwd=REPO_ROOT
         )
 
@@ -61,16 +74,28 @@ def evaluate_test(row):
             with open(cov_json, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Find the entry matching our source file (normalize both paths)
-            norm_src = os.path.normpath(src_file)
+            if "TheAlgorithms/" in src_file:
+                target_rel_path = src_file.split("TheAlgorithms/")[-1].strip(r"\/")
+            else:
+                target_rel_path = os.path.basename(src_file)
+
+            norm_target = os.path.normpath(target_rel_path)
+
             for filepath, fdata in data.get("files", {}).items():
-                # coverage.py stores paths relative to where pytest ran (REPO_ROOT)
-                candidate = os.path.normpath(os.path.join(REPO_ROOT, filepath))
-                if candidate == norm_src:
+                norm_filepath = os.path.normpath(filepath)
+                if norm_filepath.endswith(norm_target) or norm_target.endswith(norm_filepath):
                     new_cov = fdata.get("summary", {}).get("percent_covered", 0.0)
                     break
 
             os.remove(cov_json)
+
+        # === ИДЕАЛЬНАЯ ЛОВУШКА ДЛЯ БАГА ===
+        # if new_cov == 0.0:
+        #     # print(f"      [!] ОШИБКА: Покрытие 0.0")
+        #     # print(result.stdout[:500])  # Выведем чуть-чуть лога, чтобы понять причину
+        # else:
+            # print(f"      [V] Успех! Покрытие: {new_cov}%")
+        # ==================================
 
         row[7] = round(new_cov, 2)
 
@@ -88,38 +113,76 @@ def evaluate_test(row):
     return row
 
 
-def main():
-    if not os.path.exists(CSV_IN):
-        print(f"File not found: {CSV_IN}")
+def process_directory(out_dir):
+    """Функция для обработки одной конкретной папки run_X"""
+    folder_name = os.path.basename(out_dir)
+    csv_in = os.path.join(out_dir, "metrics_qwen_coder_TheAlgorithms.csv")
+    csv_out = os.path.join(out_dir, "metrics_fixed_coverage.csv")
+
+    if not os.path.exists(csv_in):
+        print(f"  [ПРОПУСК] Не найден исходный CSV: {csv_in}")
         return
 
-    # Читаем старый CSV
-    with open(CSV_IN, "r", encoding="utf-8") as f:
+    print(f"\n[{folder_name}] Запуск обработки...")
+    with open(csv_in, "r", encoding="utf-8") as f:
         reader = csv.reader(f)
         header = next(reader)
         rows = list(reader)
 
-    print(f"Loaded {len(rows)} files from CSV. Starting coverage evaluation...")
-
     processed_rows = []
-    # Запускаем проверку в 16 потоков
+
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(evaluate_test, row): row for row in rows}
+        # Передаем current_out_dir каждому воркеру
+        futures = {executor.submit(evaluate_test, row, out_dir): row for row in rows}
 
         count = 0
         for future in as_completed(futures):
             processed_rows.append(future.result())
             count += 1
-            if count % 50 == 0:
-                print(f"Evaluated {count}/{len(rows)} tests...")
+            if count % 100 == 0:
+                print(f"  [{folder_name}] Проверено {count}/{len(rows)} тестов...")
 
-    # Сохраняем в новый файл
-    with open(CSV_OUT, "w", newline="", encoding="utf-8") as f:
+    with open(csv_out, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(processed_rows)
 
-    print(f"\nDONE! Fixed metrics saved to: {CSV_OUT}")
+    print(f"[{folder_name}] ГОТОВО! Сохранено в {csv_out}")
+
+
+def main():
+
+    if not os.path.exists(BASE_DIR):
+        print(f"Ошибка: Не найдена базовая папка {BASE_DIR}")
+        return
+
+    # Собираем все папки, которые начинаются на "run_"
+    run_folders = sorted([
+        f for f in os.listdir(BASE_DIR)
+        if os.path.isdir(os.path.join(BASE_DIR, f)) and f.startswith("run_")
+    ])
+
+    print(f"Найдено папок для обработки: {len(run_folders)}")
+    print("=" * 40)
+
+    start_time = time.time()
+    # Запускаем цикл по всем найденным папкам
+    for folder in run_folders:
+        full_out_dir = os.path.join(BASE_DIR, folder)
+        process_directory(full_out_dir)
+    # process_directory(os.path.join(BASE_DIR, "run_1_repeat_mut_fixed"))
+
+    end_time = time.time()
+
+    # Считаем минуты и секунды
+    total_seconds = end_time - start_time
+    minutes = int(total_seconds // 60)
+    seconds = int(total_seconds % 60)
+
+    print("\n" + "=" * 50)
+    print("🚀 ВСЕ ПАПКИ УСПЕШНО ОБРАБОТАНЫ!")
+    print(f"⏱️ Общее время прогона модели: {minutes} мин {seconds} сек")
+    print("=" * 50)
 
 
 if __name__ == "__main__":
