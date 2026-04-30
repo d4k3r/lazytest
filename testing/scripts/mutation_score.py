@@ -1064,15 +1064,38 @@ def process_run(
             processed_rows.append(row)
             completed_since_save += 1
 
-            status = row.get("mutation_status", "")
-            score = row.get("mutation_score_viable", "")
-            print(
-                f"  [{model}/{run_dir.name}] "
-                f"{index}/{len(tasks_to_process)} "
-                f"{row.get('source_file')} -> {status} "
-                f"score={score}",
-                flush=True,
+            status = row.get("mutation_status", "") or "unknown"
+
+            if "status_counts" not in locals():
+                status_counts = {}
+
+            status_counts[status] = status_counts.get(status, 0) + 1
+
+            should_print_progress = (
+                    index % args.progress_every == 0
+                    or index == len(tasks_to_process)
             )
+
+            if should_print_progress:
+                scores = [
+                    float(r["mutation_score_viable"])
+                    for r in processed_rows
+                    if str(r.get("mutation_score_viable", "")).strip() != ""
+                ]
+
+                mean_score = round(sum(scores) / len(scores), 2) if scores else "N/A"
+
+                compact_counts = ", ".join(
+                    f"{k}={v}" for k, v in sorted(status_counts.items())
+                )
+
+                print(
+                    f"  [{model}/{run_dir.name}] "
+                    f"{index}/{len(tasks_to_process)} completed | "
+                    f"mean_score={mean_score} | "
+                    f"{compact_counts}",
+                    flush=True,
+                )
 
             if completed_since_save >= args.save_every:
                 atomic_write_csv(out_csv, processed_rows)
