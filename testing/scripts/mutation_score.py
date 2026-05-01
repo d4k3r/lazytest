@@ -106,6 +106,7 @@ TERMINAL_STATUSES = {
     "cosmic_db_missing",
     "cosmic_db_parse_error",
     "no_mutants",
+    "no_viable_mutants",
     "unexpected_error",
 }
 
@@ -1029,6 +1030,7 @@ def process_run(
         return processed_rows
 
     completed_since_save = 0
+    status_counts: dict[str, int] = {}
 
     with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
         futures = {
@@ -1065,9 +1067,6 @@ def process_run(
             completed_since_save += 1
 
             status = row.get("mutation_status", "") or "unknown"
-
-            if "status_counts" not in locals():
-                status_counts = {}
 
             status_counts[status] = status_counts.get(status, 0) + 1
 
@@ -1285,8 +1284,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--save-every",
         type=int,
-        default=5,
-        help="Save per-run CSV after this many completed tasks. Default: 5",
+        default=25,
+        help="Save per-run CSV after this many completed tasks. Default: 25",
+    )
+
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=25,
+        help="Print progress after this many completed tasks. Default: 25",
     )
 
     parser.add_argument(
