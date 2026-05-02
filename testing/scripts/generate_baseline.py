@@ -18,12 +18,17 @@
 # - If pytest fails, send the previous test file and traceback back to the model.
 # - Maximum 5 attempts per source file.
 # - If all attempts fail, no final test file is kept.
+#
+# CSV schema intentionally matches the repository-aware LazyTest script:
+# repo, source_file, status, gen_time_s, chars, n_tests, attempts,
+# file_cov_pct, repo_cov_pct, notes
 # ==============================================================================
 
 import os
 import re
 import csv
 import sys
+import json
 import time
 import random
 import shutil
@@ -43,6 +48,7 @@ MAX_WORKERS = 60
 MAX_RETRIES = 5
 
 PYTEST_TIMEOUT_SECONDS = 30
+COVERAGE_TIMEOUT_SECONDS = 900
 API_TIMEOUT_SECONDS = 1200
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -151,9 +157,6 @@ def effective_import_root(repo_path: str, src_path: str) -> str:
     Examples:
         repo/maths/graphs/file.py      -> effective root = repo
         repo/src/package/module.py     -> effective root = repo/src
-
-    This is still generic and not repository-specific. It only handles the
-    common Python src/ layout.
     """
     repo_path = os.path.abspath(repo_path)
     src_path = os.path.abspath(src_path)
@@ -458,6 +461,22 @@ def append_failure_log(
             log.write("\n")
 
 
+def append_coverage_log(
+    out_root: str,
+    repo_name: str,
+    message: str,
+) -> None:
+    log_path = os.path.join(out_root, "coverage_debug.log")
+
+    with _log_lock:
+        with open(log_path, "a", encoding="utf-8") as log:
+            log.write("\n\n" + "=" * 80 + "\n")
+            log.write(f"REPO: {repo_name}\n")
+            log.write("=" * 80 + "\n")
+            log.write(message)
+            log.write("\n")
+
+
 # ==============================================================================
 # LLM / PYTEST EXECUTION
 # ==============================================================================
@@ -570,10 +589,140 @@ def short_error_summary(error_output: str) -> str:
 
 
 # ==============================================================================
+# COVERAGE EXECUTION
+# ==============================================================================
+
+def run_repo_coverage(
+    repo_path: str,
+    repo_name: str,
+    out_root: str,
+) -> tuple[float, dict[str, float]]:
+    """
+    Run pytest-cov over all successfully saved generated tests for this repo.
+
+    Returns:
+        repo_cov_pct, file_cov_dict
+
+    file_cov_dict maps absolute normalized source file paths to coverage percent.
+    """
+    repo_out_dir = os.path.join(out_root, repo_name)
+    cov_json_path = os.path.join(out_root, f"{repo_name}_coverage.json")
+
+    repo_cov = 0.0
+    file_cov_dict = {}
+
+    if not os.path.exists(repo_out_dir):
+        return repo_cov, file_cov_dict
+
+    env = os.environ.copy()
+
+    base_pythonpath = pythonpath_for_repo(repo_path)
+    old_pythonpath = env.get("PYTHONPATH", "")
+
+    if old_pythonpath:
+        env["PYTHONPATH"] = base_pythonpath + os.pathsep + old_pythonpath
+    else:
+        env["PYTHONPATH"] = base_pythonpath
+
+    if os.path.exists(cov_json_path):
+        try:
+            os.remove(cov_json_path)
+        except OSError:
+            pass
+
+    pytest_cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        repo_out_dir,
+        f"--cov={repo_path}",
+        f"--cov-report=json:{cov_json_path}",
+        "--cov-append",
+        "-p",
+        "no:cacheprovider",
+        "--continue-on-collection-errors",
+        "--timeout=30",
+        "-q",
+    ]
+
+    try:
+        proc = subprocess.run(
+            pytest_cmd,
+            capture_output=True,
+            text=True,
+            timeout=COVERAGE_TIMEOUT_SECONDS,
+            env=env,
+            cwd=repo_path,
+        )
+
+        if proc.returncode != 0:
+            append_coverage_log(
+                out_root,
+                repo_name,
+                "Coverage pytest returned non-zero exit code.\n\n"
+                f"STDOUT:\n{proc.stdout[-5000:]}\n\n"
+                f"STDERR:\n{proc.stderr[-5000:]}\n",
+            )
+
+        if os.path.exists(cov_json_path):
+            with open(cov_json_path, "r", encoding="utf-8") as f:
+                cov_data = json.load(f)
+
+            repo_cov = cov_data.get("totals", {}).get("percent_covered", 0.0)
+
+            for filepath, fdata in cov_data.get("files", {}).items():
+                if os.path.isabs(filepath):
+                    abs_filepath = os.path.normpath(filepath)
+                else:
+                    abs_filepath = os.path.normpath(os.path.join(repo_path, filepath))
+
+                file_cov = fdata.get("summary", {}).get("percent_covered", 0.0)
+                file_cov_dict[abs_filepath] = file_cov
+
+            try:
+                os.remove(cov_json_path)
+            except OSError:
+                pass
+
+        else:
+            append_coverage_log(
+                out_root,
+                repo_name,
+                "Coverage JSON was not produced.\n\n"
+                f"STDOUT:\n{proc.stdout[-5000:]}\n\n"
+                f"STDERR:\n{proc.stderr[-5000:]}\n",
+            )
+
+    except subprocess.TimeoutExpired:
+        append_coverage_log(
+            out_root,
+            repo_name,
+            f"Coverage pytest timed out after {COVERAGE_TIMEOUT_SECONDS} seconds.",
+        )
+
+    except Exception as exc:
+        append_coverage_log(
+            out_root,
+            repo_name,
+            f"Coverage execution failed: {type(exc).__name__}: {exc}",
+        )
+
+    return repo_cov, file_cov_dict
+
+
+# ==============================================================================
 # PER-FILE PROCESSING
 # ==============================================================================
 
 def process_file(task: tuple[str, str, str, str]) -> tuple:
+    """
+    Returns a tuple matching the repository-aware script's pre-coverage schema:
+
+        repo, source_file, status, gen_time_s, chars, n_tests, attempts, notes
+
+    Coverage columns are appended later in process_repo after all generated
+    tests for the repository have been saved.
+    """
     repo_name, repo_path, src_path, out_root = task
 
     start_time = time.time()
@@ -587,7 +736,6 @@ def process_file(task: tuple[str, str, str, str]) -> tuple:
         return (
             repo_name,
             src_path,
-            "",
             "read_error",
             0.0,
             0,
@@ -600,7 +748,6 @@ def process_file(task: tuple[str, str, str, str]) -> tuple:
         return (
             repo_name,
             src_path,
-            "",
             "empty_file",
             0.0,
             0,
@@ -725,7 +872,6 @@ def process_file(task: tuple[str, str, str, str]) -> tuple:
     return (
         repo_name,
         src_path,
-        module_name,
         status,
         elapsed,
         len(test_code),
@@ -776,7 +922,6 @@ def process_repo(repo_path: str, out_root: str, metrics_writer: csv.writer) -> N
                 (
                     _repo_name,
                     src_path,
-                    module_name,
                     status,
                     _elapsed,
                     _chars,
@@ -785,6 +930,7 @@ def process_repo(repo_path: str, out_root: str, metrics_writer: csv.writer) -> N
                     notes,
                 ) = result
 
+                module_name = module_name_from_path(repo_path, src_path)
                 filename = os.path.basename(src_path)
 
                 if status == "ok":
@@ -802,13 +948,47 @@ def process_repo(repo_path: str, out_root: str, metrics_writer: csv.writer) -> N
             except Exception as exc:
                 print(f"[WORKER CRASH] {exc}")
 
+    total_gen_time = round(time.time() - start_repo, 2)
+    print(f"Generation finished in {total_gen_time}s. Running pytest for coverage...")
+
+    repo_cov, file_cov_dict = run_repo_coverage(
+        repo_path=repo_path,
+        repo_name=repo_name,
+        out_root=out_root,
+    )
+
     file_results.sort(key=lambda row: row[1])
 
     for result in file_results:
-        metrics_writer.writerow(result)
+        (
+            repo_name,
+            src_path,
+            status,
+            elapsed,
+            chars,
+            n_tests,
+            attempts,
+            notes,
+        ) = result
+
+        norm_src = os.path.normpath(src_path)
+        file_cov = file_cov_dict.get(norm_src, 0.0) if status == "ok" else 0.0
+
+        metrics_writer.writerow([
+            repo_name,
+            src_path,
+            status,
+            elapsed,
+            chars,
+            n_tests,
+            attempts,
+            round(file_cov, 2),
+            round(repo_cov, 2),
+            notes,
+        ])
 
     total_time = round(time.time() - start_repo, 2)
-    print(f"Finished repo: {repo_name} in {total_time}s")
+    print(f"Finished repo: {repo_name} totally in {total_time}s")
     print()
 
 
@@ -832,12 +1012,13 @@ def main() -> None:
         writer.writerow([
             "repo",
             "source_file",
-            "module_name",
             "status",
             "gen_time_s",
             "chars",
             "n_tests",
             "attempts",
+            "file_cov_pct",
+            "repo_cov_pct",
             "notes",
         ])
 
