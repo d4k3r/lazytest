@@ -1079,7 +1079,8 @@ def process_run(
                 scores = [
                     float(r["mutation_score_viable"])
                     for r in processed_rows
-                    if str(r.get("mutation_score_viable", "")).strip() != ""
+                    if r.get("mutation_status") == "mutation_processed"
+                       and str(r.get("mutation_score_viable", "")).strip() != ""
                 ]
 
                 mean_score = round(sum(scores) / len(scores), 2) if scores else "N/A"
