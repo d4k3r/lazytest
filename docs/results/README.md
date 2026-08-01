@@ -1,6 +1,7 @@
 # Dissertation result figures
 
-These figures are publication renderings of the final dissertation figures. Their
+These figures are publication renderings of the
+[final dissertation](../LazyTest_Dissertation.pdf) figures. Their
 source PDFs are preserved in `source-pdfs/`; the PNGs are 180-DPI renderings for
 GitHub. The figures report the exact evaluated configurations from a controlled
 TheAlgorithms/Python case study, not a universal model leaderboard.

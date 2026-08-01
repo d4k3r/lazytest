@@ -8,7 +8,8 @@ retained so each public label remains traceable to its private aggregate row.
 
 This is a compact, report-supporting extract—not the complete per-target experiment
 dataset. It does not include generated tests, prompts, raw responses, detailed failure
-logs or enough data to reproduce every dissertation analysis independently.
+logs or enough data to reproduce every analysis in the
+[dissertation](../docs/LazyTest_Dissertation.pdf) independently.
 
 All six conditions use the controlled 1,144-file TheAlgorithms/Python target set.
 `final_pass_percentage` is recomputed from the integer passing and target counts and

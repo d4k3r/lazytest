@@ -39,4 +39,5 @@ python testing/scripts/verify_public_results.py
 That check supports the six-row headline generation comparison only. It does not
 reproduce every coverage, mutation, prompt-variant or secondary-route analysis.
 Generation, coverage and mutation summaries can also use different surviving
-denominators; consult the dissertation methodology before comparing them.
+denominators; consult the
+[dissertation methodology](LazyTest_Dissertation.pdf) before comparing them.

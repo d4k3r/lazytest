@@ -8,9 +8,8 @@ This directory contains the public documentation assets for LazyTest.
 - `results/` contains the dissertation result figures and interpretation notes.
 - `reproducibility.md` describes the public reproduction boundary and setup.
 - `licensing.md` explains which repository materials the software MIT licence covers.
-- `LazyTest_Dissertation.pdf` is the reserved path for a redacted public copy of
-  the final dissertation. The private PDF containing the author's student identifier
-  must not be committed.
+- [`LazyTest_Dissertation.pdf`](LazyTest_Dissertation.pdf) is the redacted public
+  dissertation containing the complete methodology, evaluation and limitations.
 
 ## Rights and scope
 

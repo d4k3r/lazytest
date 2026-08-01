@@ -196,10 +196,10 @@ See [`SECURITY.md`](SECURITY.md) for the detailed trust model and operational ca
 
 ## Dissertation and further details
 
-A redacted public copy of the final dissertation is being prepared for
-`docs/LazyTest_Dissertation.pdf`. The current private source PDF is intentionally not
-included because its cover contains a student identifier. The software licence does
-not apply to the dissertation.
+The complete methodology, experimental configuration, evaluation and limitations are
+available in the [redacted public dissertation](docs/LazyTest_Dissertation.pdf).
+The dissertation is a separate academic document; the software MIT licence does not
+apply to it.
 
 ## Licence and citation
 
