@@ -41,4 +41,3 @@ must not be interpreted as evidence that LLMs generally outperform Pynguin.
 Across all four figures, generation, coverage and mutation metrics can use different
 surviving denominators. All claims remain limited to the controlled
 TheAlgorithms/Python case study.
-

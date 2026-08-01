@@ -290,7 +290,7 @@ IMPORTS — READ CAREFULLY:
 - Any import line you write will be automatically deleted before the test runs.
 
 TESTING RULES:
-- Test ONLY these explicitly defined symbols and respect their signatures: 
+- Test ONLY these explicitly defined symbols and respect their signatures:
 {symbols_str}
 {docstring_rule}
 
