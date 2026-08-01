@@ -48,6 +48,8 @@ The main matched comparison used the same five-attempt validation and repair all
 
 All percentages use the fixed **1,144-file generation target set** discovered in TheAlgorithms/Python after technical filtering. Repository-aware LazyTest achieved higher final full-target-set executability in all three matched comparisons.
 
+The six supporting aggregate rows are published in [`results/main_comparisons.csv`](results/main_comparisons.csv). They can be checked against the integer counts and this table with `python testing/scripts/verify_public_results.py`; no private per-target dataset is required for that validation.
+
 ![Main matched LazyTest comparison](docs/results/main_pipeline_comparison.png)
 
 The figure additionally shows target-normalised combined coverage and viable
