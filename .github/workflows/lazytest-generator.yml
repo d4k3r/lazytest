@@ -484,20 +484,7 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          python -m pip install \
-            pytest \
-            pytest-timeout \
-            pytest-cov \
-            coverage \
-            requests \
-            openai \
-            google-generativeai
-
-          case "$GENERATOR" in
-            pynguin|pynguin-chatgpt|pynguin-gemini|pynguin-local-llm)
-              python -m pip install pynguin
-              ;;
-          esac
+          python -m pip install -r requirements/workflow.txt
 
       - name: Install target project dependencies
         shell: bash

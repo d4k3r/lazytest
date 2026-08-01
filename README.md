@@ -153,14 +153,13 @@ Remove `--dry-run` to execute mutation testing after confirming the discovered p
 
 There is no single environment or GPU configuration for every route.
 
-- **Common Python/test dependencies:** Python, `pytest`, `pytest-timeout`, and the target repository's own dependencies.
-- **Workflow dependencies:** `pytest-cov`, `coverage`, `requests`, `openai`, `google-generativeai`, and `pynguin` for Pynguin-based modes. GitHub Actions also uses `actions/checkout`, `actions/setup-python`, artefact upload, PR commenting and optional auto-commit actions.
-- **Local LLM generation:** the `openai` Python client plus a separately provisioned OpenAI-compatible endpoint, such as a supported vLLM or LM Studio deployment. Model-serving dependencies and hardware requirements depend on the selected model.
-- **Coverage evaluation:** `pytest-cov`, `coverage` and `pytest-timeout`.
-- **Mutation evaluation:** Cosmic Ray, pytest and `pytest-timeout`; the script also requires a Unix-like environment for process-group signalling used during timeout cleanup.
-- **Analysis/plotting:** the supplied plotting utility imports `pandas`, `matplotlib` and `seaborn`.
+- `requirements/common.txt` covers pytest execution, timeouts and coverage.
+- `requirements/workflow.txt` covers the GitHub Actions API and Pynguin routes.
+- `requirements/local-generation.txt` covers the client for a separately provisioned OpenAI-compatible endpoint; it does not install a model server, model weights or GPU drivers.
+- `requirements/mutation.txt` covers Cosmic Ray and the common test tools. Its process handling is intended for a Unix-like environment; use WSL or Linux when starting from Windows.
+- `requirements/analysis.txt` covers the optional pandas, matplotlib and seaborn utilities.
 
-The existing research environment freeze should not be treated as a minimal portable dependency specification.
+See [`requirements/README.md`](requirements/README.md) for installation examples. The former broad research-machine freezes have been removed because they described one machine rather than a portable project environment.
 
 ## Outputs
 
