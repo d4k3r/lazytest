@@ -104,7 +104,7 @@ The command parser permits the following controlled Pynguin passthrough options:
 
 Cloud routes require repository secrets `OPENAI_API_KEY` or `GEMINI_API_KEY` as applicable. The optional `LOCAL_LLM_API_KEY` secret supports authenticated OpenAI-compatible local endpoints. Repository variables can set `OPENAI_MODEL`, `GEMINI_MODEL`, `LOCAL_LLM_BASE_URL` and `LOCAL_LLM_MODEL`; the YAML contains fallback values when these variables are absent.
 
-`local-llm` and `pynguin-local-llm` run on a `self-hosted` runner. The other verified modes use `ubuntu-latest`. The workflow refuses forked pull requests and unauthorised comment authors before executing PR code. Optional commits follow the selected commit mode; not every optional branch is claimed to have been exercised in the recorded demonstration.
+`local-llm` and `pynguin-local-llm` run on a `self-hosted` runner. The other verified modes use `ubuntu-latest`. The workflow refuses forked pull requests and unauthorised comment authors before checkout or execution, then validates the exact PR head SHA without persisted checkout credentials. Optional commits follow the selected commit mode in a separate GitHub-hosted writeback job, which refuses to push if the PR head changed after validation. Not every optional branch is claimed to have been exercised in the recorded demonstration.
 
 ### Local empirical pipeline
 
@@ -178,7 +178,7 @@ Depending on the route and stage, LazyTest produces:
 
 > **Generated code and pull-request code must be treated as untrusted.**
 
-The workflow refuses forked pull requests before checkout and limits execution to commands from repository `OWNER`, `MEMBER` or `COLLABORATOR` users. Self-hosted runners should not execute untrusted external contributions. These checks establish a bounded trust boundary, but the prototype is not a complete sandbox for arbitrary untrusted code, generated tests or third-party dependencies.
+The workflow refuses forked pull requests before checkout and limits execution to commands from repository `OWNER`, `MEMBER` or `COLLABORATOR` users. Validation has read-only repository permissions and does not persist checkout credentials; only the separate reporting/writeback job receives write permission. Self-hosted runners should not execute untrusted external contributions. These checks establish a bounded trust boundary, but the prototype is not a complete sandbox for arbitrary untrusted code, generated tests or third-party dependencies.
 
 ## Limitations
 

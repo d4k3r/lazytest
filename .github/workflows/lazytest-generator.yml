@@ -413,7 +413,7 @@ jobs:
 
       - name: Report unauthorised command use
         if: steps.safety.outputs.authorised == 'false'
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -425,7 +425,7 @@ jobs:
 
       - name: Report forked PR refusal
         if: steps.safety.outputs.authorised == 'true' && steps.safety.outputs.same_repo == 'false'
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -434,6 +434,13 @@ jobs:
             This workflow is restricted to pull requests from branches in the same repository.
 
             Reason: LazyTest validates generated tests by executing `pull_request` code. Running untrusted fork code with write permissions, secrets, or a `self-hosted` runner is unsafe.
+
+      - name: Add accepted-command reaction
+        if: steps.safety.outputs.can_run == 'true'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          reactions: rocket
 
   generate-tests:
     needs:
@@ -445,23 +452,28 @@ jobs:
     runs-on: ${{ needs.parse-command.outputs.runner }}
 
     permissions:
-      contents: write
-      issues: write
+      contents: read
       pull-requests: read
 
+    outputs:
+      has_changed_files: ${{ steps.changed_files.outputs.has_changed_files }}
+      all_changed_files: ${{ steps.changed_files.outputs.all_changed_files }}
+      generated_count: ${{ steps.generate.outputs.generated_count }}
+      successful_count: ${{ steps.generate.outputs.successful_count }}
+      test_containing_count: ${{ steps.generate.outputs.test_containing_count }}
+      test_status: ${{ steps.run_tests.outputs.test_status }}
+      test_passed: ${{ steps.run_tests.outputs.test_passed }}
+      test_exit_code: ${{ steps.run_tests.outputs.test_exit_code }}
+      test_summary: ${{ steps.run_tests.outputs.test_summary }}
+
     steps:
-      - name: Add reaction
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          comment-id: ${{ github.event.comment.id }}
-          reactions: rocket
 
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ needs.preflight.outputs.head_repo }}
-          ref: ${{ needs.preflight.outputs.head_ref }}
-          token: ${{ github.token }}
+          ref: ${{ needs.preflight.outputs.head_sha }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Fetch base branch
@@ -471,7 +483,7 @@ jobs:
           git fetch origin "${{ needs.preflight.outputs.base_ref }}:refs/remotes/origin/${{ needs.preflight.outputs.base_ref }}"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -1633,7 +1645,7 @@ jobs:
 
       - name: Upload LazyTest artifacts
         if: always() && steps.changed_files.outputs.has_changed_files == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lazytest-results-pr-${{ github.event.issue.number }}-${{ needs.parse-command.outputs.generator }}
           path: |
@@ -1651,31 +1663,101 @@ jobs:
             changed_candidates.txt
           if-no-files-found: ignore
 
-      - name: Commit generated tests
+  report-and-writeback:
+    needs:
+      - parse-command
+      - preflight
+      - generate-tests
+
+    if: ${{ always() && needs.preflight.outputs.can_run == 'true' }}
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout verified PR head for optional writeback
         if: >
-          steps.changed_files.outputs.has_changed_files == 'true' &&
-          steps.generate.outputs.generated_count != '0' &&
+          needs.generate-tests.result == 'success' &&
+          needs.generate-tests.outputs.has_changed_files == 'true' &&
+          needs.generate-tests.outputs.generated_count != '0' &&
           needs.parse-command.outputs.commit_mode != 'none' &&
           (
             needs.parse-command.outputs.commit_mode == 'all' ||
-            steps.run_tests.outputs.test_passed == 'true'
+            needs.generate-tests.outputs.test_passed == 'true'
           )
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          commit_message: "test: LazyTest generated tests (${{ needs.parse-command.outputs.generator }})"
-          branch: ${{ needs.preflight.outputs.head_ref }}
-          file_pattern: |
-            tests/generated/*.py
-            lazytest_manifest.json
-            lazytest_results.csv
-            evaluation_manifest.csv
-            evaluation_manifest.json
-            run_metadata.json
+          repository: ${{ needs.preflight.outputs.head_repo }}
+          ref: ${{ needs.preflight.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Download validated result artifact
+        if: >
+          needs.generate-tests.result == 'success' &&
+          needs.generate-tests.outputs.has_changed_files == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lazytest-results-pr-${{ github.event.issue.number }}-${{ needs.parse-command.outputs.generator }}
+          path: .
+
+      - name: Commit generated tests to unchanged PR head
+        id: writeback
+        continue-on-error: true
+        if: >
+          needs.generate-tests.result == 'success' &&
+          needs.generate-tests.outputs.has_changed_files == 'true' &&
+          needs.generate-tests.outputs.generated_count != '0' &&
+          needs.parse-command.outputs.commit_mode != 'none' &&
+          (
+            needs.parse-command.outputs.commit_mode == 'all' ||
+            needs.generate-tests.outputs.test_passed == 'true'
+          )
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          HEAD_REF: ${{ needs.preflight.outputs.head_ref }}
+          GENERATOR: ${{ needs.parse-command.outputs.generator }}
+        run: |
+          set -euo pipefail
+
+          REMOTE_HEAD="$(git ls-remote origin "refs/heads/$HEAD_REF" | awk '{print $1}')"
+          if [ "$REMOTE_HEAD" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "::error::PR head changed after validation; refusing writeback."
+            exit 1
+          fi
+
+          git checkout -B "$HEAD_REF" "$EXPECTED_HEAD_SHA"
+          git add -- tests/generated/
+          for result_file in \
+            lazytest_manifest.json \
+            lazytest_results.csv \
+            evaluation_manifest.csv \
+            evaluation_manifest.json \
+            run_metadata.json \
             coverage.json
+          do
+            if [ -f "$result_file" ]; then
+              git add -- "$result_file"
+            fi
+          done
+
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test: LazyTest generated tests ($GENERATOR)"
+          git push origin "HEAD:refs/heads/$HEAD_REF"
 
       - name: Report results
-        if: always() && steps.changed_files.outputs.has_changed_files == 'true'
-        uses: peter-evans/create-or-update-comment@v4
+        if: always() && needs.generate-tests.outputs.has_changed_files == 'true'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -1688,17 +1770,18 @@ jobs:
             **Generator:** `${{ needs.parse-command.outputs.generator }}`  
             **Runner:** `${{ needs.parse-command.outputs.runner }}`  
             **Commit mode:** `${{ needs.parse-command.outputs.commit_mode }}`  
+            **Writeback step:** `${{ steps.writeback.outcome || 'not requested' }}`
 
             **Refinement enabled:** `${{ needs.parse-command.outputs.refinement_enabled }}`  
             **Refinement model:** `${{ needs.parse-command.outputs.refinement_model }}`  
 
-            **Generated test files:** `${{ steps.generate.outputs.generated_count }}`  
-            **Syntactically valid generated files:** `${{ steps.generate.outputs.successful_count }}`  
-            **Generated files containing pytest tests:** `${{ steps.generate.outputs.test_containing_count }}`  
+            **Generated test files:** `${{ needs.generate-tests.outputs.generated_count }}`
+            **Syntactically valid generated files:** `${{ needs.generate-tests.outputs.successful_count }}`
+            **Generated files containing pytest tests:** `${{ needs.generate-tests.outputs.test_containing_count }}`
 
-            **Pytest status:** `${{ steps.run_tests.outputs.test_status || 'Not run' }}`  
-            **Pytest summary:** `${{ steps.run_tests.outputs.test_summary || 'No pytest summary available' }}`  
-            **Pytest exit code:** `${{ steps.run_tests.outputs.test_exit_code || 'N/A' }}`  
+            **Pytest status:** `${{ needs.generate-tests.outputs.test_status || 'Not run' }}`
+            **Pytest summary:** `${{ needs.generate-tests.outputs.test_summary || 'No pytest summary available' }}`
+            **Pytest exit code:** `${{ needs.generate-tests.outputs.test_exit_code || 'N/A' }}`
 
             **Coverage artifact:** `coverage.json`  
             **Failure log:** `failure.log`  
@@ -1711,14 +1794,14 @@ jobs:
 
             **Target files:**
             ```text
-            ${{ steps.changed_files.outputs.all_changed_files }}
+            ${{ needs.generate-tests.outputs.all_changed_files }}
             ```
 
-            Generated tests, logs, coverage data, run metadata, and metric files were uploaded as workflow artifacts. Where the selected commit mode allowed it, generated tests and metadata were also committed to the PR branch.
+            Generated tests, logs, coverage data, run metadata, and metric files were uploaded as workflow artifacts. Where the selected commit mode allowed it, the guarded writeback job also committed generated tests and metadata to the unchanged PR head.
 
       - name: Report no changed Python files
-        if: always() && steps.changed_files.outputs.has_changed_files == 'false'
-        uses: peter-evans/create-or-update-comment@v4
+        if: always() && needs.generate-tests.outputs.has_changed_files == 'false'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -1731,3 +1814,13 @@ jobs:
             No changed non-test Python files were detected, so no tests were generated.
 
             This can happen when the pull request changes only documentation, configuration files, existing tests, `conftest.py`, `test_*.py`, or `*_test.py` files.
+
+      - name: Report validation job failure
+        if: always() && needs.generate-tests.result != 'success'
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### LazyTest Generation Report
+
+            The trusted validation job did not complete successfully. No writeback was attempted. Inspect the workflow logs for the failure details.
