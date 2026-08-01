@@ -24,6 +24,7 @@
 # file_cov_pct, repo_cov_pct, notes
 # ==============================================================================
 
+import argparse
 import os
 import re
 import csv
@@ -36,9 +37,6 @@ import threading
 import subprocess
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
-from openai import OpenAI
-
 
 # ==============================================================================
 # CONFIGURATION
@@ -73,13 +71,32 @@ METRICS_CSV = os.path.join(
 
 API_BASE_URL = "http://localhost:18000/v1"
 MODEL_NAME = "Qwen/Qwen3.5-27B"
+API_KEY_ENV = "OPENAI_API_KEY"
 
-client = OpenAI(base_url=API_BASE_URL, api_key="not-needed")
+client = None
 
 _log_lock = threading.Lock()
 
 # Used inside prompt strings to avoid literal markdown fences inside this file.
 BT3 = "\x60" * 3
+
+
+def get_client():
+    """Create the endpoint client only when a generation request is made."""
+    global client
+    if client is None:
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise RuntimeError(
+                "The 'openai' package is required for generation. "
+                "Install requirements/local-generation.txt."
+            ) from exc
+        client = OpenAI(
+            base_url=API_BASE_URL,
+            api_key=os.getenv(API_KEY_ENV, "not-needed"),
+        )
+    return client
 
 
 # ==============================================================================
@@ -486,7 +503,7 @@ def call_llm(prompt: str) -> tuple[str, str]:
     Return:
         raw_output, token_note
     """
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=MODEL_NAME,
         messages=[
             {
@@ -548,7 +565,7 @@ def run_pytest(test_file: str, repo_path: str) -> tuple[bool, str]:
         "-m",
         "pytest",
         test_file,
-        "--timeout=20",
+        f"--timeout={PYTEST_TIMEOUT_SECONDS}",
         "--tb=short",
         "-q",
         "-p",
@@ -641,7 +658,7 @@ def run_repo_coverage(
         "-p",
         "no:cacheprovider",
         "--continue-on-collection-errors",
-        "--timeout=30",
+        f"--timeout={PYTEST_TIMEOUT_SECONDS}",
         "-q",
     ]
 
@@ -996,7 +1013,72 @@ def process_repo(repo_path: str, out_root: str, metrics_writer: csv.writer) -> N
 # MAIN
 # ==============================================================================
 
-def main() -> None:
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Generate generic baseline pytest tests with an OpenAI-compatible endpoint."
+    )
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=PROJECT_ROOT / "testing" / "repos_for_testing" / "TheAlgorithms",
+        help="Target repository checkout (default: repository-relative TheAlgorithms path).",
+    )
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        default=PROJECT_ROOT / "testing" / "generated_tests" / "public-generic-baseline",
+        help="Directory for generated tests and private run logs.",
+    )
+    parser.add_argument("--output-csv", default="metrics.csv", help="Metrics filename inside output-root.")
+    parser.add_argument("--model", default="Qwen/Qwen3.5-27B", help="Model identifier sent to the endpoint.")
+    parser.add_argument("--endpoint", default="http://localhost:18000/v1", help="OpenAI-compatible API base URL.")
+    parser.add_argument(
+        "--api-key-env",
+        default="OPENAI_API_KEY",
+        help="Environment variable containing the API key; local endpoints may leave it unset.",
+    )
+    parser.add_argument("--workers", type=int, default=60, help="Concurrent source-file workers.")
+    parser.add_argument(
+        "--attempts",
+        type=int,
+        default=5,
+        help="Total generation attempts per target (default: 5, matching the dissertation).",
+    )
+    parser.add_argument("--pytest-timeout", type=int, default=30, help="Pytest timeout in seconds.")
+    parser.add_argument("--generation-timeout", type=int, default=1200, help="Model request timeout in seconds.")
+    parser.add_argument("--coverage-timeout", type=int, default=900, help="Repository coverage timeout in seconds.")
+    return parser.parse_args(argv)
+
+
+def configure(args):
+    global REPOS, OUT_DIR, METRICS_CSV, MODEL_NAME, API_BASE_URL, API_KEY_ENV
+    global MAX_WORKERS, MAX_RETRIES, PYTEST_TIMEOUT_SECONDS
+    global API_TIMEOUT_SECONDS, COVERAGE_TIMEOUT_SECONDS, client
+
+    if args.workers < 1 or args.attempts < 1:
+        raise ValueError("--workers and --attempts must be positive")
+    if min(args.pytest_timeout, args.generation_timeout, args.coverage_timeout) < 1:
+        raise ValueError("timeout values must be positive")
+    if Path(args.output_csv).name != args.output_csv:
+        raise ValueError("--output-csv must be a filename, not a path")
+
+    REPOS = [str(args.repo_root.resolve())]
+    OUT_DIR = str(args.output_root.resolve())
+    METRICS_CSV = os.path.join(OUT_DIR, args.output_csv)
+    MODEL_NAME = args.model
+    API_BASE_URL = args.endpoint
+    API_KEY_ENV = args.api_key_env
+    MAX_WORKERS = args.workers
+    MAX_RETRIES = args.attempts
+    PYTEST_TIMEOUT_SECONDS = args.pytest_timeout
+    API_TIMEOUT_SECONDS = args.generation_timeout
+    COVERAGE_TIMEOUT_SECONDS = args.coverage_timeout
+    client = None
+
+
+def main(argv=None) -> None:
+    args = parse_args(argv)
+    configure(args)
     ensure_dir(OUT_DIR)
 
     attempts_dir = os.path.join(OUT_DIR, "_attempts")

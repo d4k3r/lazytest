@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the dissertation below."
+title: "LazyTest"
+type: software
+authors:
+  - family-names: "Maltsev"
+    given-names: "Ilya"
+repository-code: "https://github.com/d4k3r/lazytest"
+license: MIT
+preferred-citation:
+  type: thesis
+  title: "LazyTest: Repository-Aware LLM Unit-Test Generation for Python in a Controlled TheAlgorithms Case Study"
+  authors:
+    - family-names: "Maltsev"
+      given-names: "Ilya"
+  institution:
+    name: "University of Manchester"
+  thesis-type: "Bachelor's dissertation"
+  year: 2026

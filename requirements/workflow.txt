@@ -1,0 +1,6 @@
+# Dependencies used by .github/workflows/lazytest-generator.yml.
+-r common.txt
+requests
+openai
+google-generativeai
+pynguin

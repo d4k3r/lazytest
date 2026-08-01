@@ -1,0 +1,3 @@
+# Cosmic Ray execution is best supported in a Unix-like environment.
+-r common.txt
+cosmic-ray

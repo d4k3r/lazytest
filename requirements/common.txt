@@ -1,0 +1,5 @@
+# Test execution and coverage shared by the public scripts.
+pytest
+pytest-timeout
+pytest-cov
+coverage

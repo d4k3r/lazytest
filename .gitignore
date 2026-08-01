@@ -1,0 +1,42 @@
+# Private publication inputs and planning material
+/publication_inputs/
+/README.proposed.md
+/Repository_changes_required_before_publishing.md
+
+# External evaluation checkouts (obtain separately)
+/testing/repos_for_testing/
+
+# Generated research and workflow outputs
+/testing/generated_tests/
+/tests/generated/
+**/prompt_debug.log
+**/prompt_logs/
+**/raw_responses/
+**/failure.log
+**/failed_tests_log.txt
+**/hallucinations_debug.log
+**/all_file_results.csv
+
+# Coverage, mutation and test caches
+.coverage
+.coverage.*
+coverage.json
+htmlcov/
+.pytest_cache/
+**/__pycache__/
+*.py[cod]
+*.sqlite
+*.sqlite3
+
+# Local environments and editors
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

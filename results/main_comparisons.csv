@@ -1,0 +1,7 @@
+internal_condition_id,public_condition_label,route,pipeline_type,target_count,final_passing_count,final_pass_percentage,matched_difference_pp,source_provenance
+qwen_3.5_baseline/run_10_generic_baseline_no_repeat,Qwen 27B generic baseline,Qwen 27B,generic baseline,1144,1049,91.70,,Private final run summary; included_in_main=yes; comparison_group=main_baseline_vs_lazytest
+qwen_3.5/run_7_no_repeat_base_prompt_long_traceback,Qwen 27B repository-aware LazyTest,Qwen 27B,repository-aware LazyTest,1144,1088,95.10,3.40,Private final run summary; included_in_main=yes; comparison_group=main_baseline_vs_lazytest
+qwen_3.5_9b_baseline/run_10_generic_baseline_no_repeat,Qwen 9B generic baseline,Qwen 9B,generic baseline,1144,814,71.15,,Private final run summary; included_in_main=yes; comparison_group=main_baseline_vs_lazytest
+qwen_3.5_9b/run_1_no_repeat_base_prompt_long_traceback,Qwen 9B repository-aware LazyTest,Qwen 9B,repository-aware LazyTest,1144,883,77.19,6.04,Private final run summary; included_in_main=yes; comparison_group=main_baseline_vs_lazytest
+qwen_3.5_9b_cyankiwi_baseline/run_10_generic_baseline_no_repeat,Qwen 9B AWQ generic baseline,Qwen 9B AWQ,generic baseline,1144,761,66.52,,Private final run summary; included_in_main=yes; comparison_group=main_baseline_vs_lazytest
+qwen_3.5_9b_cyankiwi/run_1_no_repeat_base_prompt_long_traceback,Qwen 9B AWQ repository-aware LazyTest,Qwen 9B AWQ,repository-aware LazyTest,1144,868,75.87,9.35,Private final run summary; included_in_main=yes; comparison_group=main_baseline_vs_lazytest
