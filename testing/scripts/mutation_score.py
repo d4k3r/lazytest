@@ -711,8 +711,6 @@ def evaluate_task(
             str(repo_root.resolve()),
             str(task["generated_repo_root"]),
             str(task["generated_repo_root"].resolve()),
-            "/workspace/lazytest/testing/repos_for_testing/TheAlgorithms",
-            os.path.expanduser("~/git/lazytest/testing/repos_for_testing/TheAlgorithms"),
         }
 
         rewrite_paths.update(extra_rewrite_paths)

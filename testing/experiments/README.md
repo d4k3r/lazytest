@@ -33,3 +33,10 @@ be mistaken for the exact run-7 base-prompt condition in the headline comparison
 
 When a canonical public script is refactored, its unmodified research snapshot is
 retained here before semantics-affecting changes are made.
+
+## Reference snapshots
+
+`reference-snapshots/` contains the exact pre-portability versions of the public
+repository-aware generator, generic baseline and branch-coverage recalculator. The
+corresponding files under `testing/scripts/` retain their research logic but add
+lazy dependency loading, explicit paths and safe command-line configuration.

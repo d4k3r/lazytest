@@ -1,5 +1,4 @@
 ﻿#!/usr/bin/env python3
-import argparse
 import os
 import csv
 import time
@@ -7,7 +6,6 @@ import json
 import glob
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 # ============================================================
 # CONFIG
@@ -21,9 +19,7 @@ from pathlib import Path
 #   qwen_coder_next/
 #     run_1_...
 #     ...
-SCRIPT_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = SCRIPT_DIR.parent.parent
-BASE_ROOT = str(PROJECT_ROOT / "testing" / "generated_tests")
+BASE_ROOT = os.path.expanduser("~/git/lazytest/testing/generated_tests")
 
 MODEL_DIRS = [
     "qwen_3.5",
@@ -36,7 +32,7 @@ MODEL_DIRS = [
 
 # Real local path to the checked-out TheAlgorithms repository.
 # This is the path pytest/cov will actually use.
-REPO_ROOT = str(PROJECT_ROOT / "testing" / "repos_for_testing" / "TheAlgorithms")
+REPO_ROOT = os.path.expanduser("~/git/lazytest/testing/repos_for_testing/TheAlgorithms")
 
 # Folder inside each run folder where generated tests are stored.
 # Example:
@@ -503,75 +499,7 @@ def process_directory(run_dir):
     print(f"[{folder_name}] DONE -> {csv_out}")
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Recalculate statement and branch coverage for generated-test metrics."
-    )
-    parser.add_argument(
-        "--generated-root",
-        type=Path,
-        default=PROJECT_ROOT / "testing" / "generated_tests",
-        help="Root containing model/run directories.",
-    )
-    parser.add_argument(
-        "--repo-root",
-        type=Path,
-        default=PROJECT_ROOT / "testing" / "repos_for_testing" / "TheAlgorithms",
-        help="Target repository checkout used by pytest-cov.",
-    )
-    parser.add_argument(
-        "--model-dir",
-        action="append",
-        dest="model_dirs",
-        help="Model subdirectory to process; repeat to select multiple (default: historical set).",
-    )
-    parser.add_argument(
-        "--input-metrics-glob",
-        default="metrics_qwen_coder_TheAlgorithms.csv",
-        help="Input metrics filename or glob within each run directory.",
-    )
-    parser.add_argument(
-        "--output-csv",
-        default="metrics_statement_branch_coverage.csv",
-        help="Output filename written inside each run directory.",
-    )
-    parser.add_argument("--workers", type=int, default=14, help="Concurrent coverage workers.")
-    parser.add_argument("--pytest-timeout", type=int, default=10, help="Per-test pytest timeout in seconds.")
-    parser.add_argument("--evaluation-timeout", type=int, default=45, help="Coverage subprocess timeout in seconds.")
-    parser.add_argument(
-        "--strict-coverage",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Count coverage only when pytest passes (default: enabled).",
-    )
-    return parser.parse_args(argv)
-
-
-def configure(args):
-    global BASE_ROOT, REPO_ROOT, MODEL_DIRS, INPUT_CSV_GLOB, OUTPUT_CSV_NAME
-    global MAX_WORKERS, PYTEST_TIMEOUT_SECONDS, SUBPROCESS_TIMEOUT_SECONDS
-    global ONLY_COUNT_COVERAGE_IF_PYTEST_PASSES
-
-    if args.workers < 1 or min(args.pytest_timeout, args.evaluation_timeout) < 1:
-        raise ValueError("workers and timeout values must be positive")
-    if Path(args.output_csv).name != args.output_csv:
-        raise ValueError("--output-csv must be a filename, not a path")
-
-    BASE_ROOT = str(args.generated_root.resolve())
-    REPO_ROOT = str(args.repo_root.resolve())
-    if args.model_dirs:
-        MODEL_DIRS = args.model_dirs
-    INPUT_CSV_GLOB = args.input_metrics_glob
-    OUTPUT_CSV_NAME = args.output_csv
-    MAX_WORKERS = args.workers
-    PYTEST_TIMEOUT_SECONDS = args.pytest_timeout
-    SUBPROCESS_TIMEOUT_SECONDS = args.evaluation_timeout
-    ONLY_COUNT_COVERAGE_IF_PYTEST_PASSES = args.strict_coverage
-
-
-def main(argv=None):
-    args = parse_args(argv)
-    configure(args)
+def main():
     if not os.path.exists(BASE_ROOT):
         print(f"ERROR: BASE_ROOT not found: {BASE_ROOT}")
         return

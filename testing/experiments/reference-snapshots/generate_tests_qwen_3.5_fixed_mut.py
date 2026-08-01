@@ -11,7 +11,6 @@ generate_llm_tests.py
 Pipeline: generate tests for Python files using Local LLM (vLLM/LM Studio).
 """
 
-import argparse
 import os
 import re
 import time
@@ -27,13 +26,10 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from openai import OpenAI
+
 ##### CONFIGURATION #####
 MAX_WORKERS = 60
-MAX_RETRIES = 5
-PYTEST_TIMEOUT_SECONDS = 30
-GENERATION_TIMEOUT_SECONDS = 1200
-COVERAGE_TIMEOUT_SECONDS = 900
-NORMALISE_PACKAGES = False
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
@@ -44,30 +40,11 @@ METRICS_CSV = os.path.join(OUT_DIR, "metrics_qwen_coder_TheAlgorithms.csv")
 ##### LLM CONFIGURATION #####
 API_BASE_URL = "http://localhost:18000/v1"
 MODEL_NAME = "Qwen/Qwen3.5-27B"
-API_KEY_ENV = "OPENAI_API_KEY"
 
-client = None
+client = OpenAI(base_url=API_BASE_URL, api_key="not-needed")
 
 # Лок для безопасной записи логов из нескольких потоков
 _log_lock = threading.Lock()
-
-
-def get_client():
-    """Create the OpenAI-compatible client only when generation actually starts."""
-    global client
-    if client is None:
-        try:
-            from openai import OpenAI
-        except ImportError as exc:
-            raise RuntimeError(
-                "The 'openai' package is required for generation. "
-                "Install requirements/local-generation.txt."
-            ) from exc
-        client = OpenAI(
-            base_url=API_BASE_URL,
-            api_key=os.getenv(API_KEY_ENV, "not-needed"),
-        )
-    return client
 
 
 def find_py_files(repo_path):
@@ -259,6 +236,9 @@ def get_symbols_with_signatures(tree):
     return sigs[:50]
 
 
+MAX_RETRIES = 5
+
+
 def process_file(args):
     repo_name, repo_path, src, out_root = args
     out_file = mirror_out_path(out_root, repo_name, src, repo_path)
@@ -344,7 +324,7 @@ Source code to test:
         attempts += 1
         try:
             # repeated_prompt = f"{current_prompt}\n\nLet me repeat that:\n\n{current_prompt}"
-            response = get_client().chat.completions.create(
+            response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[
                     {"role": "system",
@@ -354,7 +334,7 @@ Source code to test:
                 temperature=0.8 + max(0, attempts - 1) * 0.01,
                 top_p=0.95,
                 max_tokens=16384,
-                timeout=GENERATION_TIMEOUT_SECONDS,
+                timeout=1200,
                 extra_body={
                     "top_k": 20,
                     "min_p": 0.0,
@@ -418,7 +398,7 @@ Source code to test:
 
         cmd = [
             sys.executable, "-m", "pytest", out_file,
-            f"--timeout={PYTEST_TIMEOUT_SECONDS}",
+            "--timeout=20",
             "-vv",
             "--tb=short",
             "-p", "no:cacheprovider",
@@ -426,14 +406,7 @@ Source code to test:
         ]
 
         try:
-            run_res = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                env=env,
-                cwd=repo_path,
-                timeout=PYTEST_TIMEOUT_SECONDS,
-            )
+            run_res = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=repo_path, timeout=30)
             if run_res.returncode == 0:
                 status = "ok"
                 notes = f"Passed on attempt {attempts}"
@@ -510,8 +483,7 @@ def process_repo(repo_path, out_root, metrics_writer):
     repo_path = os.path.abspath(repo_path)
     if not os.path.isdir(repo_path):
         return
-    if NORMALISE_PACKAGES:
-        ensure_init_files_in_repo(repo_path)
+    ensure_init_files_in_repo(repo_path)
     repo_name = os.path.basename(os.path.normpath(repo_path))
     print(f"Processing repo: {repo_name} ({repo_path})")
 
@@ -565,19 +537,12 @@ def process_repo(repo_path, out_root, metrics_writer):
             "--cov-append",
             "-p", "no:cacheprovider",
             "--continue-on-collection-errors",
-            f"--timeout={PYTEST_TIMEOUT_SECONDS}",
+            "--timeout=30",
             "-q"
         ]
 
         try:
-            proc = subprocess.run(
-                pytest_cmd,
-                capture_output=True,
-                text=True,
-                timeout=COVERAGE_TIMEOUT_SECONDS,
-                env=env,
-                cwd=repo_path,
-            )
+            proc = subprocess.run(pytest_cmd, capture_output=True, text=True, timeout=900, env=env, cwd=repo_path)
             if os.path.exists(cov_json_path):
                 with open(cov_json_path, "r", encoding="utf-8") as f:
                     cov_data = json.load(f)
@@ -602,78 +567,7 @@ def process_repo(repo_path, out_root, metrics_writer):
     print(f"Finished repo: {repo_name} totally in {round(time.time() - start_repo, 2)}s\n")
 
 
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Generate repository-aware pytest tests with an OpenAI-compatible endpoint."
-    )
-    parser.add_argument(
-        "--repo-root",
-        type=Path,
-        default=PROJECT_ROOT / "testing" / "repos_for_testing" / "TheAlgorithms",
-        help="Target repository checkout (default: repository-relative TheAlgorithms path).",
-    )
-    parser.add_argument(
-        "--output-root",
-        type=Path,
-        default=PROJECT_ROOT / "testing" / "generated_tests" / "public-canonical",
-        help="Directory for generated tests and private run logs.",
-    )
-    parser.add_argument("--output-csv", default="metrics.csv", help="Metrics filename inside output-root.")
-    parser.add_argument("--model", default="Qwen/Qwen3.5-27B", help="Model identifier sent to the endpoint.")
-    parser.add_argument("--endpoint", default="http://localhost:18000/v1", help="OpenAI-compatible API base URL.")
-    parser.add_argument(
-        "--api-key-env",
-        default="OPENAI_API_KEY",
-        help="Environment variable containing the API key; local endpoints may leave it unset.",
-    )
-    parser.add_argument("--workers", type=int, default=60, help="Concurrent source-file workers.")
-    parser.add_argument(
-        "--attempts",
-        type=int,
-        default=5,
-        help="Total generation attempts per target (default: 5, matching the dissertation).",
-    )
-    parser.add_argument("--pytest-timeout", type=int, default=30, help="Pytest timeout in seconds.")
-    parser.add_argument("--generation-timeout", type=int, default=1200, help="Model request timeout in seconds.")
-    parser.add_argument("--coverage-timeout", type=int, default=900, help="Repository coverage timeout in seconds.")
-    parser.add_argument(
-        "--normalise-packages",
-        action="store_true",
-        help="Opt in to creating missing __init__.py files in the target checkout; use only on a disposable copy.",
-    )
-    return parser.parse_args(argv)
-
-
-def configure(args):
-    global REPOS, OUT_DIR, METRICS_CSV, MODEL_NAME, API_BASE_URL, API_KEY_ENV
-    global MAX_WORKERS, MAX_RETRIES, PYTEST_TIMEOUT_SECONDS
-    global GENERATION_TIMEOUT_SECONDS, COVERAGE_TIMEOUT_SECONDS, NORMALISE_PACKAGES, client
-
-    if args.workers < 1 or args.attempts < 1:
-        raise ValueError("--workers and --attempts must be positive")
-    if min(args.pytest_timeout, args.generation_timeout, args.coverage_timeout) < 1:
-        raise ValueError("timeout values must be positive")
-    if Path(args.output_csv).name != args.output_csv:
-        raise ValueError("--output-csv must be a filename, not a path")
-
-    REPOS = [str(args.repo_root.resolve())]
-    OUT_DIR = str(args.output_root.resolve())
-    METRICS_CSV = os.path.join(OUT_DIR, args.output_csv)
-    MODEL_NAME = args.model
-    API_BASE_URL = args.endpoint
-    API_KEY_ENV = args.api_key_env
-    MAX_WORKERS = args.workers
-    MAX_RETRIES = args.attempts
-    PYTEST_TIMEOUT_SECONDS = args.pytest_timeout
-    GENERATION_TIMEOUT_SECONDS = args.generation_timeout
-    COVERAGE_TIMEOUT_SECONDS = args.coverage_timeout
-    NORMALISE_PACKAGES = args.normalise_packages
-    client = None
-
-
-def main(argv=None):
-    args = parse_args(argv)
-    configure(args)
+def main():
     ensure_dir(OUT_DIR)
     if os.path.exists(METRICS_CSV):
         os.remove(METRICS_CSV)
