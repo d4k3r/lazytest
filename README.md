@@ -60,7 +60,7 @@ This result should be interpreted carefully. Generic-baseline tests that survive
 
 ## Repository structure
 
-The important implementation artefacts are listed below. Several route-specific and historical scripts remain in the research repository; the canonical files should be made explicit before public release.
+The important implementation artefacts are listed below. Canonical public files are separated from route-specific and historical research scripts.
 
 | Path | Purpose |
 | --- | --- |
@@ -182,6 +182,8 @@ Depending on the route and stage, LazyTest produces:
 
 The workflow refuses forked pull requests before checkout and limits execution to commands from repository `OWNER`, `MEMBER` or `COLLABORATOR` users. Validation has read-only repository permissions and does not persist checkout credentials; only the separate reporting/writeback job receives write permission. Self-hosted runners should not execute untrusted external contributions. These checks establish a bounded trust boundary, but the prototype is not a complete sandbox for arbitrary untrusted code, generated tests or third-party dependencies.
 
+See [`SECURITY.md`](SECURITY.md) for the detailed trust model and operational cautions.
+
 ## Limitations
 
 - The empirical evaluation is a single-repository controlled case study on TheAlgorithms/Python.
@@ -198,3 +200,17 @@ A redacted public copy of the final dissertation is being prepared for
 `docs/LazyTest_Dissertation.pdf`. The current private source PDF is intentionally not
 included because its cover contains a student identifier. The software licence does
 not apply to the dissertation.
+
+## Licence and citation
+
+Project-specific software is available under the [MIT licence](LICENSE), copyright
+2026 Ilya Maltsev. Third-party dependencies retain their own licences, and the
+software MIT licence does not cover the dissertation. See the
+[licence-scope notice](docs/licensing.md) for details.
+
+Citation metadata is provided in [`CITATION.cff`](CITATION.cff), with the University
+of Manchester bachelor's dissertation as the preferred citation. No DOI, publication
+venue, release date or software version is asserted.
+
+For the public reproduction boundary and setup guidance, see
+[`docs/reproducibility.md`](docs/reproducibility.md).

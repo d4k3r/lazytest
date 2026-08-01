@@ -19,7 +19,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 #   qwen_coder_next/
 #     run_1_...
 #     ...
-BASE_ROOT = os.path.expanduser("~/git/lazytest/testing/generated_tests")
+BASE_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "testing", "generated_tests")
+)
 
 MODEL_DIRS = [
     "qwen_3.5",
@@ -32,7 +34,12 @@ MODEL_DIRS = [
 
 # Real local path to the checked-out TheAlgorithms repository.
 # This is the path pytest/cov will actually use.
-REPO_ROOT = os.path.expanduser("~/git/lazytest/testing/repos_for_testing/TheAlgorithms")
+REPO_ROOT = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..", "..", "..", "testing", "repos_for_testing", "TheAlgorithms",
+    )
+)
 
 # Folder inside each run folder where generated tests are stored.
 # Example:
@@ -129,7 +136,7 @@ def get_repo_relative_path(src_file):
     This deliberately ignores the old absolute base path from the CSV.
 
     Example:
-    /workspace/lazytest/testing/repos_for_testing/TheAlgorithms/boolean_algebra/not_gate.py
+    /old/checkout/TheAlgorithms/boolean_algebra/not_gate.py
     -> boolean_algebra/not_gate.py
 
     Also supports:

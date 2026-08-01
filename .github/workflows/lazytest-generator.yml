@@ -858,15 +858,15 @@ jobs:
           GENERATOR: ${{ needs.parse-command.outputs.generator }}
           PYNGUIN_ARGS_JSON: ${{ needs.parse-command.outputs.pynguin_args_json }}
 
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ (needs.parse-command.outputs.generator == 'chatgpt' || needs.parse-command.outputs.generator == 'pynguin-chatgpt') && secrets.OPENAI_API_KEY || '' }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
 
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY: ${{ (needs.parse-command.outputs.generator == 'gemini' || needs.parse-command.outputs.generator == 'pynguin-gemini') && secrets.GEMINI_API_KEY || '' }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
 
           LOCAL_LLM_BASE_URL: ${{ vars.LOCAL_LLM_BASE_URL }}
           LOCAL_LLM_MODEL: ${{ vars.LOCAL_LLM_MODEL }}
-          LOCAL_LLM_API_KEY: ${{ secrets.LOCAL_LLM_API_KEY }}
+          LOCAL_LLM_API_KEY: ${{ (needs.parse-command.outputs.generator == 'local-llm' || needs.parse-command.outputs.generator == 'pynguin-local-llm') && secrets.LOCAL_LLM_API_KEY || '' }}
         run: |
           set -euo pipefail
 

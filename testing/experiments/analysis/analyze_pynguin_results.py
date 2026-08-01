@@ -3,7 +3,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 
-CSV_PATH = r"D:\3rd_year_project\testing\generated_tests\pynguin\run_1\metrics_pynguin_TheAlgorithms.csv"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CSV_PATH = (
+    PROJECT_ROOT
+    / "testing"
+    / "generated_tests"
+    / "pynguin"
+    / "run_1"
+    / "metrics_pynguin_TheAlgorithms.csv"
+)
 
 pd.set_option("display.max_colwidth", None)
 pd.set_option("display.max_rows", None)

@@ -19,7 +19,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 ##### CONFIGURATION #####
 MAX_WORKERS = 80
-BASE_TESTING_DIR = r"/workspace/lazytest/testing"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+BASE_TESTING_DIR = str(PROJECT_ROOT / "testing")
 
 REPOS = [
     os.path.join(BASE_TESTING_DIR, "repos_for_testing", "requests"),

@@ -36,7 +36,8 @@ retained here before semantics-affecting changes are made.
 
 ## Reference snapshots
 
-`reference-snapshots/` contains the exact pre-portability versions of the public
-repository-aware generator, generic baseline and branch-coverage recalculator. The
-corresponding files under `testing/scripts/` retain their research logic but add
-lazy dependency loading, explicit paths and safe command-line configuration.
+`reference-snapshots/` contains the pre-portability research logic for the public
+repository-aware generator, generic baseline and branch-coverage recalculator.
+Machine-specific path defaults have been normalised for publication. The corresponding
+files under `testing/scripts/` retain the research logic but add lazy dependency
+loading, explicit paths and safe command-line configuration.

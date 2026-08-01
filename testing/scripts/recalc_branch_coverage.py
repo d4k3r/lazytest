@@ -133,7 +133,7 @@ def get_repo_relative_path(src_file):
     This deliberately ignores the old absolute base path from the CSV.
 
     Example:
-    /workspace/lazytest/testing/repos_for_testing/TheAlgorithms/boolean_algebra/not_gate.py
+    /old/checkout/TheAlgorithms/boolean_algebra/not_gate.py
     -> boolean_algebra/not_gate.py
 
     Also supports:
